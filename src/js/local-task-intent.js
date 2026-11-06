@@ -26,23 +26,32 @@ export function matchLocalTasks(phrase, tasks) {
 }
 
 const searchActions = [
-  [/\b(?:avisar|notificar|comunicar|informar)\b/g, /\b(?:avisa\w*|aviso|notific\w*|comunic\w*|informar)\b/],
-  [/\b(?:enviar|mandar|entregar|encaminhar)\b/g, /\b(?:envi\w*|entreg\w*|encaminh\w*)\b/],
-  [/\b(?:pedir|solicitar|requerer)\b/g, /\b(?:pedir|solicit\w*|requer\w*|requisic\w*)\b/],
-  [/\b(?:pagar|quitar|liquidar)\b/g, /\b(?:pagar|pagamento|quit\w*|liquid\w*)\b/]
+  [['avisar','notificar','comunicar','informar'], /\b(?:avisa\w*|aviso|notific\w*|comunic\w*|informar)\b/],
+  [['enviar','mandar','entregar','encaminhar'], /\b(?:envi\w*|entreg\w*|encaminh\w*)\b/],
+  [['pedir','solicitar','requerer'], /\b(?:pedir|solicit\w*|requer\w*|requisic\w*)\b/],
+  [['pagar','quitar','liquidar'], /\b(?:pagar|pagamento|quit\w*|liquid\w*)\b/]
 ];
 const searchStop = new Set('ainda agora hoje gente minha meu dele dela vai vou vamos preciso precisamos somente apenas'.split(' '));
 const actionBoundary = /[.!?;\n,]|\s+(?:mas|porem|se|caso|depois|enquanto|porque|quando|a nao ser que|e (?:nao|a gente|vamos|vou|preciso))\b/;
 const negatedAction = /\b(?:nao|nem|se)(?:\s+(?:vou|vai|vamos|quer|quero|precisa|precisamos|pretendo|pretendemos|devo|deve|ter que|tem que))*\s*$/;
 
+function matchesSearchVerb(word, verb) {
+  if (word === verb) return true;
+  if (word.length < 7 || word.length + 1 !== verb.length) return false;
+  // Tolerate one omitted interior letter when finding links, never when proposing a write.
+  const mismatch = [...word].findIndex((letter,index) => letter !== verb[index]);
+  return mismatch > 0 && word.slice(mismatch) === verb.slice(mismatch + 1);
+}
+
 export function relatedTaskMatches(text, tasks) {
   const report = normalize(text);
-  const intents = searchActions.flatMap(([spoken,registered]) => [...report.matchAll(spoken)].flatMap((match) => {
-    if (negatedAction.test(report.slice(Math.max(0,match.index - 55),match.index))) return [];
+  const intents = [...report.matchAll(/\b[a-z]{5,}\b/g)].flatMap((match) => {
+    const action = searchActions.find(([verbs]) => verbs.some((verb) => matchesSearchVerb(match[0],verb)));
+    if (!action || negatedAction.test(report.slice(Math.max(0,match.index - 55),match.index))) return [];
     const object = report.slice(match.index + match[0].length).split(actionBoundary,1)[0].trim();
     const subject = [...terms(object.split(/\s+/).slice(0,8).join(' '))].filter((word) => !searchStop.has(word));
-    return subject.length ? [{registered,subject}] : [];
-  }));
+    return subject.length ? [{registered:action[1],subject}] : [];
+  });
   const ranked = tasks.flatMap((task) => {
     if (task.archived || ['resolvido','cancelado'].includes(task.statusCode)) return [];
     const actionText = normalize([task.title,task.nextAction].join(' '));

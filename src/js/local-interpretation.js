@@ -217,7 +217,10 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
     }
     if (/^(?:(?:a gente|eu|nos)\s+)?nao\s+(?:vou|vai|vamos)\s+(?:mexer|mudar|alterar|meter a mao)\b/.test(clause)) continue;
     if (/^se\b/.test(clause) || /\b(?:se|caso)\s+(?:a|o|p[0-9])/.test(clause) && taskIds.length > 1) {
-      proposals.push(information('A mudança foi descrita como condicional. Confirme o que já aconteceu e indique a ação que deve ser aplicada.'));
+      const related = relatedTaskMatches(input,tasks).slice(0,3).map((task) => task.id);
+      proposals.push({...information(related.length
+        ? 'A ação depende de confirmação. Abra a pendência correspondente para conferir os detalhes.'
+        : 'A mudança foi descrita como condicional. Confirme o que já aconteceu e indique a ação que deve ser aplicada.'),candidateIds:related});
       continue;
     }
     if (incorporated) {

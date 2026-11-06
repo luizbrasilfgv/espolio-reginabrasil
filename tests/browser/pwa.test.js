@@ -206,7 +206,7 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     assert.equal((await db.doc('estates/regina/tasks/P13').get()).get('statusCode'),'cancelado');
     assert.equal((await db.doc('estates/regina/tasks/P04').get()).get('version'),1);
     await view.getByRole('button',{name:'Nova fala',exact:true}).click();
-    await editor.fill('A gente não vai mexer com fatura de cartão nem débito automático. A pendência que ainda tem é a gente avisar os bancos mas eu não vou mexer em nada de cartão a não ser que o cartório já tenha comunicado.');
+    await editor.fill('a gente não vai mexer em nada com fatura do cartão de credito dela.. apenas vai comuncar ao banco... se o cartório não avisou a gente vai avisar e pronto.');
     await view.getByRole('button',{name:'Analisar e mostrar alterações'}).click();
     const matches = view.locator('.proposal').filter({hasText:'Pendências relacionadas ao relato'});
     await matches.getByRole('link',{name:'U05 · Banco Aurora — comunicação e extratos'}).waitFor();
