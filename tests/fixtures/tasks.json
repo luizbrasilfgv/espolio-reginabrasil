@@ -1,0 +1,285 @@
+[
+  {
+    "id": "U01",
+    "title": "Documentação essencial",
+    "topic": "documentos_inss",
+    "priority": "urgente",
+    "statusCode": "a_conferir",
+    "nextAction": "Reunir/conferir certidão de óbito, identidades, contratos, faturas e correspondências."
+  },
+  {
+    "id": "U02",
+    "title": "Escritório de exemplo — contato e documentos",
+    "topic": "juridico_patrimonio",
+    "priority": "urgente",
+    "statusCode": "aguardando_escritorio",
+    "nextAction": "Conferir a situação do item de teste.",
+    "relatedTaskIds": [
+      "S02"
+    ],
+    "contactText": "escritorio@example.test",
+    "protocolText": "1234567891"
+  },
+  {
+    "id": "U03",
+    "title": "Pendência de teste U03",
+    "topic": "documentos_inss",
+    "priority": "urgente",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "U04",
+    "title": "Pendência de teste U04",
+    "topic": "saude_reembolsos",
+    "priority": "urgente",
+    "statusCode": "nao_confirmado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "U05",
+    "title": "Pendência de teste U05",
+    "topic": "bancos_financas",
+    "priority": "urgente",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "U06",
+    "title": "Pendência de teste U06",
+    "topic": "bancos_financas",
+    "priority": "urgente",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "U07",
+    "title": "Pendência de teste U07",
+    "topic": "bancos_financas",
+    "priority": "urgente",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "U08",
+    "title": "Fatura de cartão de teste",
+    "topic": "bancos_financas",
+    "priority": "urgente",
+    "statusCode": "a_conferir",
+    "nextAction": "Conferir a fatura de teste estimada em R$ 1.500.",
+    "dueDate": "2026-11-10"
+  },
+  {
+    "id": "U09",
+    "title": "Serviço funerário — entrega",
+    "topic": "funeral_cinzas",
+    "priority": "urgente",
+    "statusCode": "aguardando_riopax",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "U10",
+    "title": "Cerimônia de teste",
+    "topic": "funeral_cinzas",
+    "priority": "urgente",
+    "statusCode": "agendado",
+    "nextAction": "Conferir a situação do item de teste.",
+    "dueDate": "2026-11-09"
+  },
+  {
+    "id": "P01",
+    "title": "Claro/NET — cancelamento",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "em_andamento",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P02",
+    "title": "Light — transferência de titularidade",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "resolvido",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P03",
+    "title": "Naturgy — transferência de titularidade",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "resolvido",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P04",
+    "title": "Condomínio — retirar guia e pagar",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "pagamento_pendente",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P05",
+    "title": "Inventário do pai — localizar processo",
+    "topic": "juridico_patrimonio",
+    "priority": "proximos_dias",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P06",
+    "title": "Pendência de teste P06",
+    "topic": "juridico_patrimonio",
+    "priority": "proximos_dias",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P07",
+    "title": "Pendência de teste P07",
+    "topic": "bancos_financas",
+    "priority": "proximos_dias",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P08",
+    "title": "Pendência de teste P08",
+    "topic": "saude_reembolsos",
+    "priority": "proximos_dias",
+    "statusCode": "em_analise",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P09",
+    "title": "Pendência de teste P09",
+    "topic": "saude_reembolsos",
+    "priority": "proximos_dias",
+    "statusCode": "a_conferir",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P10",
+    "title": "Pendência de teste P10",
+    "topic": "funeral_cinzas",
+    "priority": "proximos_dias",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P11",
+    "title": "Naturgy — forma de pagamento e débito automático",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "a_conferir",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "P12",
+    "title": "Light — pagamento da fatura de novembro",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "resolvido",
+    "nextAction": "Conferir a situação do item de teste.",
+    "amountApproxBRL": 250
+  },
+  {
+    "id": "P13",
+    "title": "Água — cobrança e titularidade",
+    "topic": "imovel_contas",
+    "priority": "proximos_dias",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste.",
+    "relatedTaskIds": [
+      "P04"
+    ]
+  },
+  {
+    "id": "S01",
+    "title": "Pendência de teste S01",
+    "topic": "juridico_patrimonio",
+    "priority": "proximas_semanas",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S02",
+    "title": "Precatório — habilitação e homologação",
+    "topic": "juridico_patrimonio",
+    "priority": "proximas_semanas",
+    "statusCode": "aguardando_escritorio",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S03",
+    "title": "Pendência de teste S03",
+    "topic": "juridico_patrimonio",
+    "priority": "proximas_semanas",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S04",
+    "title": "Pendência de teste S04",
+    "topic": "funeral_cinzas",
+    "priority": "proximas_semanas",
+    "statusCode": "a_conferir",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S05",
+    "title": "Pendência de teste S05",
+    "topic": "bancos_financas",
+    "priority": "proximas_semanas",
+    "statusCode": "a_investigar",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S06",
+    "title": "Pendência de teste S06",
+    "topic": "juridico_patrimonio",
+    "priority": "proximas_semanas",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S07",
+    "title": "Pendência de teste S07",
+    "topic": "outros_contratos",
+    "priority": "proximas_semanas",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S08",
+    "title": "Pendência de teste S08",
+    "topic": "outros_contratos",
+    "priority": "proximas_semanas",
+    "statusCode": "nao_iniciado",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S09",
+    "title": "Taxa de incêndio — pagamento",
+    "topic": "imovel_contas",
+    "priority": "proximas_semanas",
+    "statusCode": "pagamento_pendente",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S10",
+    "title": "Pendência de teste S10",
+    "topic": "funeral_cinzas",
+    "priority": "proximas_semanas",
+    "statusCode": "decisao_futura",
+    "nextAction": "Conferir a situação do item de teste."
+  },
+  {
+    "id": "S11",
+    "title": "Pendência de teste S11",
+    "topic": "imovel_contas",
+    "priority": "proximas_semanas",
+    "statusCode": "a_conferir",
+    "nextAction": "Conferir a situação do item de teste."
+  }
+]

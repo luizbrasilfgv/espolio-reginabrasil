@@ -1,0 +1,205 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /estates/regina {
+      function memberPath(uid) {
+        return /databases/$(database)/documents/estates/regina/members/$(uid);
+      }
+      function taskPath(id) {
+        return /databases/$(database)/documents/estates/regina/tasks/$(id);
+      }
+      function eventPath(id) {
+        return /databases/$(database)/documents/estates/regina/reginaEvents/$(id);
+      }
+      function sequencePath(prefix) {
+        return /databases/$(database)/documents/estates/regina/idSequences/$(prefix);
+      }
+      function signed() {
+        return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com'
+          && request.auth.token.email_verified == true;
+      }
+      function mine(uid) { return signed() && request.auth.uid == uid; }
+      function member() { return get(memberPath(request.auth.uid)).data; }
+      function active() {
+        return signed() && exists(memberPath(request.auth.uid))
+          && member().accessStatus == 'active' && member().role in ['admin', 'editor', 'viewer'];
+      }
+      function admin() { return active() && member().role == 'admin'; }
+      function editor() { return active() && member().role in ['admin', 'editor']; }
+      function canEdit() {
+        return editor() && get(/databases/$(database)/documents/estates/regina/config/app).data.allowManualEdits == true;
+      }
+      function fields(data, keys) { return data.keys().hasAll(keys) && data.keys().hasOnly(keys); }
+      function txt(x, n) { return x is string && x.size() <= n; }
+      function required(x, n) { return txt(x, n) && x.matches('(?s).*\\S.*'); }
+      function optional(x, n) { return x == null || txt(x, n); }
+      function taskId(id) { return id is string && id.matches('[UPS](0[1-9]|[1-9][0-9]{1,5})'); }
+      function idAt(prefix, number) {
+        return prefix + (number < 10 ? '0' : '') + string(number);
+      }
+      function ownerValid(data) {
+        return data.ownerUid == null || (
+          required(data.ownerUid, 128)
+          && get(memberPath(data.ownerUid)).data.accessStatus == 'active'
+          && data.ownerLabel == get(memberPath(data.ownerUid)).data.displayName
+        );
+      }
+      function relations(ids, ownId) {
+        return ids is list && ids.size() <= 10 && !(ownId in ids)
+          && ids.toSet().size() == ids.size()
+          && (ids.size() == 0 || validJoinedIds(ids, ids.join(',')));
+      }
+      function validJoinedIds(ids, joined) {
+        return joined.matches('[UPS](0[1-9]|[1-9][0-9]{1,5})(,[UPS](0[1-9]|[1-9][0-9]{1,5}))*')
+          && joined.split(',') == ids;
+      }
+      function validTask(data, id) {
+        return fields(data, [
+          'id','title','topic','priority','statusCode','ownerUid','ownerLabel','description','nextAction',
+          'dueDate','relatedTaskIds','blockedByIds','protocolText','contactText','amountApproxBRL',
+          'amountIsExact','sourceType','sourceNote','archived','tags','version','lastEventId','createdAt',
+          'updatedAt','updatedByUid'
+        ]) && taskId(id) && data.id == id && required(data.title, 140)
+          && data.topic in ['imovel_contas','juridico_patrimonio','bancos_financas','funeral_cinzas',
+                            'saude_reembolsos','documentos_inss','outros_contratos']
+          && data.priority in ['urgente','proximos_dias','proximas_semanas']
+          && data.statusCode in ['nao_iniciado','nao_confirmado','a_conferir','a_investigar','em_andamento',
+                                 'em_analise','aguardando_escritorio','aguardando_riopax','aguardando_resposta',
+                                 'pagamento_pendente','decisao_futura','agendado','resolvido','cancelado']
+          && optional(data.ownerLabel, 100) && txt(data.description, 2400) && required(data.nextAction, 1000)
+          && (data.dueDate == null || (data.dueDate is string
+            && data.dueDate.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])')))
+          && relations(data.relatedTaskIds, id) && relations(data.blockedByIds, id)
+          && optional(data.protocolText, 250) && optional(data.contactText, 250)
+          && (data.amountApproxBRL == null || (data.amountApproxBRL is number
+            && data.amountApproxBRL >= 0 && data.amountApproxBRL <= 1000000000))
+          && data.amountIsExact is bool && (data.amountApproxBRL != null || !data.amountIsExact)
+          && data.sourceType in ['documento','relato_familiar','resposta_terceiro','inferencia_ia','indefinido']
+          && txt(data.sourceNote, 2000) && data.archived is bool
+          && txt(data.tags, 200)
+          && data.updatedAt == request.time && data.updatedByUid == request.auth.uid
+          && data.version is int && data.version >= 1
+          && data.lastEventId is string && data.lastEventId.matches('[A-Za-z0-9_-]{16,64}');
+      }
+      function audit(data) { return getAfter(eventPath(data.lastEventId)).data; }
+      function hasAudit(data, before) {
+        let event = audit(data);
+        return event.taskId == data.id && event.createdAt == request.time
+          && event.before == before && event.after == data;
+      }
+      function validTransition(data, before) {
+        return (data.archived == before.archived || audit(data).operation == 'archive')
+          && ((before.statusCode != 'resolvido' && data.statusCode != 'cancelado')
+            || data.statusCode == before.statusCode || required(audit(data).summary, 400))
+          && (data.statusCode == before.statusCode || data.statusCode != 'resolvido'
+            || audit(data).operation in ['complete','correction','split']);
+      }
+
+      match /config/{id} {
+        allow get: if active() && id in ['app','roster'];
+        allow update: if admin() && id == 'app'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['aiEnabled','speechEnabled','allowManualEdits'])
+          && request.resource.data.aiEnabled is bool && request.resource.data.speechEnabled is bool
+          && request.resource.data.allowManualEdits is bool;
+        allow create, update: if admin() && id == 'roster'
+          && fields(request.resource.data, ['names']) && request.resource.data.names is map
+          && request.resource.data.names.size() <= 50;
+      }
+      match /members/{uid} {
+        allow get: if mine(uid) || admin();
+        allow list: if admin() && request.query.limit <= 100;
+        allow create, update: if admin() && uid != request.auth.uid
+          && fields(request.resource.data, ['uid','email','displayName','role','accessStatus',
+                     'approvedByUid','approvedAt','createdAt','updatedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.role in ['editor','viewer']
+          && request.resource.data.accessStatus in ['active','suspended','revoked']
+          && required(request.resource.data.email, 254) && required(request.resource.data.displayName, 100)
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.approvedByUid == request.auth.uid
+          && request.resource.data.approvedAt == request.time
+          && (resource == null ? request.resource.data.createdAt == request.time
+              : (resource.data.role != 'admin' && request.resource.data.createdAt == resource.data.createdAt));
+      }
+      match /accessRequests/{uid} {
+        function validRequest() {
+          let d = request.resource.data;
+          return fields(d, ['uid','googleEmail','googleDisplayName','requestText','status','requestedAt','lastUpdatedAt'])
+            && d.uid == uid && d.googleEmail == request.auth.token.email
+            && d.googleDisplayName == request.auth.token.get('name', '')
+            && txt(d.googleDisplayName, 100) && txt(d.requestText, 400) && d.status == 'pending'
+            && d.requestedAt == request.time && d.lastUpdatedAt == request.time;
+        }
+        allow get: if mine(uid) || admin();
+        allow list: if admin() && request.query.limit <= 100;
+        allow create: if mine(uid) && !exists(memberPath(uid)) && validRequest();
+        allow update: if admin() && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','lastUpdatedAt'])
+          && request.resource.data.status in ['approved','rejected']
+          && request.resource.data.lastUpdatedAt == request.time
+          && (request.resource.data.status != 'approved' || getAfter(memberPath(uid)).data.accessStatus == 'active');
+      }
+      match /tasks/{id} {
+        allow get: if active();
+        allow list: if active() && request.query.limit <= 200;
+        allow create: if canEdit() && validTask(request.resource.data, id) && ownerValid(request.resource.data)
+          && request.resource.data.version == 1 && request.resource.data.createdAt == request.time
+          && !request.resource.data.archived
+          && hasAudit(request.resource.data, null)
+          && sequenceMatches(id);
+        allow update: if canEdit() && request.resource.data.version == resource.data.version + 1
+          && validTask(request.resource.data, id)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerUid','ownerLabel'])
+              || ownerValid(request.resource.data))
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.lastEventId != resource.data.lastEventId
+          && hasAudit(request.resource.data, resource.data)
+          && validTransition(request.resource.data, resource.data);
+        function sequenceMatches(id) {
+          let prefix = id[0:1];
+          let path = sequencePath(prefix);
+          let next = getAfter(path).data.last;
+          return next == get(path).data.last + 1 && idAt(prefix, next) == id;
+        }
+      }
+      match /idSequences/{prefix} {
+        allow get: if editor() && prefix in ['U','P','S'];
+        allow update: if canEdit() && prefix in ['U','P','S']
+          && fields(request.resource.data, ['prefix','last','updatedAt'])
+          && request.resource.data.prefix == prefix && request.resource.data.updatedAt == request.time
+          && request.resource.data.last is int && request.resource.data.last == resource.data.last + 1
+          && request.resource.data.last <= 999999 && allocated(prefix, request.resource.data.last);
+        function allocated(p, n) {
+          let path = taskPath(idAt(p, n));
+          return !exists(path) && getAfter(path).data.version == 1
+            && getAfter(path).data.updatedAt == request.time;
+        }
+      }
+      match /reginaEvents/{eventId} {
+        allow get: if active();
+        allow list: if active() && request.query.limit <= 100;
+        allow create: if canEdit() && validEvent(request.resource.data);
+        function validEvent(d) {
+          return fields(d, ['eventId','taskId','actorUid','channel','operation','summary',
+                            'baseVersion','resultVersion','createdAt','before','after','transcript'])
+            && d.eventId == eventId && taskId(d.taskId) && d.actorUid == request.auth.uid
+            && d.channel in ['manual','ai_approved']
+            && optional(d.transcript, 2500) && (d.transcript == null || d.channel == 'ai_approved')
+            && required(d.summary, 400) && d.createdAt == request.time
+            && d.resultVersion is int && d.baseVersion is int && d.resultVersion == d.baseVersion + 1
+            && matchesTask(d);
+        }
+        function matchesTask(d) {
+          let path = taskPath(d.taskId);
+          let after = getAfter(path).data;
+          return after == d.after && after.lastEventId == d.eventId && after.version == d.resultVersion
+            && after.updatedAt == request.time
+            && (d.baseVersion == 0
+              ? (d.before == null && !exists(path) && d.operation in ['create','split'])
+              : (d.before == get(path).data && d.before.version == d.baseVersion
+                  && d.operation in ['update','complete','correction','archive','split']));
+        }
+      }
+    }
+  }
+}

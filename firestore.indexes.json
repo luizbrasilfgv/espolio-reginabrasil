@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "reginaEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "taskId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "reginaEvents",
+      "fieldPath": "before",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "reginaEvents",
+      "fieldPath": "after",
+      "indexes": []
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env*
+!.env.example
+.firebaserc
+*-debug.log*
+.firebase/
+test-results/
+.npm-cache/
+firebase.production.local.json
+dist-emulator/
+/data/initial-tasks.json
+/design/canva-design-links.md

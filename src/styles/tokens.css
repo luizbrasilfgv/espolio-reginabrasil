@@ -1,0 +1,21 @@
+/* Canva DAHaKYdzKu0 and the project brief */
+:root {
+  color-scheme: light;
+  --bg: #f7f7f2;
+  --surface: #fff;
+  --subtle: #edf0eb;
+  --ink: #26332d;
+  --muted: #5c6961;
+  --accent: #506e5b;
+  --accent-deep: #345544;
+  --border: #d7dfd8;
+  --danger: #9b3c37;
+  --success: #2c7050;
+  --warning: #805b12;
+  --cream: #f6efdf;
+  --radius: 14px;
+  --control: 10px;
+  --shadow: 0 2px 12px #26332d09;
+  --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: Georgia, 'Times New Roman', serif;
+}
