@@ -45,20 +45,30 @@ function matchesSearchVerb(word, verb) {
 
 export function relatedTaskMatches(text, tasks) {
   const report = normalize(text);
+  const open = tasks.filter((task) => !task.archived && !['resolvido','cancelado'].includes(task.statusCode));
   const intents = [...report.matchAll(/\b[a-z]{5,}\b/g)].flatMap((match) => {
     const action = searchActions.find(([verbs]) => verbs.some((verb) => matchesSearchVerb(match[0],verb)));
     if (!action || negatedAction.test(report.slice(Math.max(0,match.index - 55),match.index))) return [];
     const object = report.slice(match.index + match[0].length).split(actionBoundary,1)[0].trim();
     const subject = [...terms(object.split(/\s+/).slice(0,8).join(' '))].filter((word) => !searchStop.has(word));
-    return subject.length ? [{registered:action[1],subject}] : [];
+    if (!subject.length) return [];
+    const recipient = terms(object.split(/\s+(?:sobre|a respeito de|em relacao a)\b/,1)[0]);
+    const named = open.filter((task) => {
+      const [name,taskSubject] = task.title.split(/\s+[-–—]\s+/);
+      const names = terms(name);
+      return taskSubject && names.size && [...names].every((word) => recipient.has(word));
+    });
+    return [{registered:action[1],subject,named}];
   });
-  const ranked = tasks.flatMap((task) => {
-    if (task.archived || ['resolvido','cancelado'].includes(task.statusCode)) return [];
+  const ranked = open.flatMap((task) => {
     const actionText = normalize([task.title,task.nextAction].join(' '));
     const heading = terms([task.title,TOPICS[task.topic]].join(' '));
     const details = terms([task.description,task.nextAction].join(' '));
-    const score = Math.max(0,...intents.map(({registered,subject}) => registered.test(actionText)
-      ? subject.reduce((total,word) => total + (heading.has(word) ? 3 : details.has(word) ? 1 : 0),0) : 0));
+    const score = Math.max(0,...intents.map(({registered,subject,named}) => {
+      const actionMatches = registered.test(actionText);
+      if (named.length) return named.includes(task) ? 30 + Number(actionMatches) : 0;
+      return actionMatches ? subject.reduce((total,word) => total + (heading.has(word) ? 3 : details.has(word) ? 1 : 0),0) : 0;
+    }));
     return score ? [{task,score}] : [];
   });
   return ranked.sort((a,b) => b.score - a.score).map(({task}) => task);

@@ -206,6 +206,12 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     assert.equal((await db.doc('estates/regina/tasks/P13').get()).get('statusCode'),'cancelado');
     assert.equal((await db.doc('estates/regina/tasks/P04').get()).get('version'),1);
     await view.getByRole('button',{name:'Nova fala',exact:true}).click();
+    await editor.fill('eu tenho que comunicar o inss sobre o falecimento');
+    await view.getByRole('button',{name:'Analisar e mostrar alterações'}).click();
+    const inss = view.locator('.proposal').filter({hasText:'Pendências relacionadas ao relato'});
+    await inss.getByRole('link',{name:'U03 · INSS — óbito e protocolo de procurador'}).waitFor();
+    assert.deepEqual(await inss.getByRole('link').allTextContents(),['U03 · INSS — óbito e protocolo de procurador']);
+    await view.getByRole('button',{name:'Nova fala',exact:true}).click();
     await editor.fill('a gente não vai mexer em nada com fatura do cartão de credito dela.. apenas vai comuncar ao banco... se o cartório não avisou a gente vai avisar e pronto.');
     await view.getByRole('button',{name:'Analisar e mostrar alterações'}).click();
     const matches = view.locator('.proposal').filter({hasText:'Pendências relacionadas ao relato'});

@@ -22,11 +22,11 @@
   },
   {
     "id": "U03",
-    "title": "Pendência de teste U03",
+    "title": "INSS — óbito e protocolo de procurador",
     "topic": "documentos_inss",
     "priority": "urgente",
     "statusCode": "nao_iniciado",
-    "nextAction": "Conferir a situação do item de teste."
+    "nextAction": "Contatar o INSS para confirmar o óbito e acompanhar o requerimento."
   },
   {
     "id": "U04",
