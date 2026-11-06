@@ -86,7 +86,10 @@ function proposalView(state, item, i) {
     + (item.values && item.confidence ? '<p class="small muted">Confiança da interpretação: ' + h(confidence[item.confidence]) + '.</p>' : '')
     + (related.length ? '<div class="row">' + related.map((id) => {
       const task = state.tasks?.find((task) => task.id === id);
-      return go(h(task ? id + ' · ' + task.title : 'Abrir ' + id),route('pendencia/' + id));
+      const name = h(task ? id + ' · ' + task.title : 'Abrir ' + id);
+      return item.choices?.some((choice) => choice.taskId === id)
+        ? btn(name,'choose-proposal','',action + ' data-task-id="' + h(id) + '"')
+        : go(name,route('pendencia/' + id));
     }).join('') + '</div>' : '')
     + banner(item.clarificationQuestion) + banner(item.error,'error')
     + (item.values ? diffHtml(item.base,item.values,state.names) : '')

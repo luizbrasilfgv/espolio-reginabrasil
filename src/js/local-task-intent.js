@@ -104,6 +104,29 @@ const collective = /^(?:(?:aos?|as?|os?)\s+)?(?:bancos|instituicoes|empresas|org
 const recipientTypes = new Set('banco instituicao empresa orgao fornecedor escritorio cartorio'.split(' '));
 const directNotice = /^(?:Avisar|Comunicar|Notificar)\b.+?(?=\s+e\s+(?:solicitar|verificar|pedir|conferir|confirmar|levantar|acompanhar)\b|[.;]|$)/iu;
 
+function withNoticeCheck(task, verification) {
+  if (task.nextAction.startsWith(verification)) return task.nextAction;
+  const step = directNotice.exec(task.nextAction);
+  if (!step) return null;
+  const rest = task.nextAction.slice(step[0].length).replace(/^(?:\s+e\s+|[.;]\s*)/iu,'').trim();
+  const instruction = step[0].charAt(0).toLowerCase() + step[0].slice(1);
+  const nextAction = verification + ' Se ainda não foi feita, ' + instruction + '.'
+    + (rest ? ' ' + rest.charAt(0).toUpperCase() + rest.slice(1) : '');
+  return nextAction.length <= 1000 ? nextAction : null;
+}
+
+export function conditionalNoticeChoices(clause, original, tasks) {
+  const condition = /^se\s+(o|a)\s+([a-z]+(?:\s+[a-z]+){0,4}?)\s+(?:ainda\s+)?nao\s+(?:avisou|comunicou|notificou)[,\s]+(?:(?:a gente|nos)\s+)?(?:vai|vamos|iremos)\s+(?:avisar|comunicar|notificar)\b/.exec(clause);
+  if (!condition) return [];
+  const start = clause.indexOf(condition[2],condition[1].length + 4);
+  const issuer = original.slice(start,start + condition[2].length);
+  const verification = 'Confirmar se a comunicação já foi feita ' + (condition[1] === 'o' ? 'pelo ' : 'pela ') + issuer + '.';
+  return tasks.flatMap((task) => {
+    const nextAction = withNoticeCheck(task,verification);
+    return nextAction && nextAction !== task.nextAction ? [{task,nextAction}] : [];
+  });
+}
+
 export function conditionalNotifications(clause, original, tasks, prior = '') {
   const action = limitedNotice.exec(clause);
   if (!action) return null;
@@ -130,13 +153,7 @@ export function conditionalNotifications(clause, original, tasks, prior = '') {
     const names = [...terms(recipient)].filter((word) => !recipientTypes.has(word));
     const nameMatch = subject && names.length && names.every((word) => spoken.has(word));
     if (!ids.has(task.id) && !nameMatch) return [];
-    if (task.nextAction.startsWith(verification)) return [{task,nextAction:task.nextAction}];
-    const step = directNotice.exec(task.nextAction);
-    if (!step) return [];
-    const rest = task.nextAction.slice(step[0].length).replace(/^(?:\s+e\s+|[.;]\s*)/iu,'').trim();
-    const instruction = step[0].charAt(0).toLowerCase() + step[0].slice(1);
-    const nextAction = verification + ' Se ainda não foi feita, ' + instruction + '.'
-      + (rest ? ' ' + rest.charAt(0).toUpperCase() + rest.slice(1) : '');
-    return nextAction.length <= 1000 ? [{task,nextAction}] : [];
+    const nextAction = withNoticeCheck(task,verification);
+    return nextAction ? [{task,nextAction}] : [];
   });
 }

@@ -209,16 +209,25 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     await editor.fill('a gente não vai mexer em nada com fatura do cartão de credito dela.. apenas vai comuncar ao banco... se o cartório não avisou a gente vai avisar e pronto.');
     await view.getByRole('button',{name:'Analisar e mostrar alterações'}).click();
     const matches = view.locator('.proposal').filter({hasText:'Pendências relacionadas ao relato'});
-    await matches.getByRole('link',{name:'U05 · Banco Aurora — comunicação e extratos'}).waitFor();
-    assert.deepEqual(await matches.getByRole('link').allTextContents(),[
+    await matches.getByRole('button',{name:'U05 · Banco Aurora — comunicação e extratos'}).waitFor();
+    assert.deepEqual(await matches.getByRole('button').allTextContents(),[
       'U05 · Banco Aurora — comunicação e extratos',
       'U06 · Banco Serra — comunicação e aplicações',
       'U07 · Vale — comunicação e contratos'
     ]);
     assert.equal(await view.getByRole('button',{name:'Aprovar e gravar',exact:true}).count(),0);
-    await matches.getByRole('link',{name:/^U07 ·/}).click();
-    await heading(view,'Vale — comunicação e contratos');
-    await nav(view,'Atualizar');
+    await matches.getByRole('button',{name:/^U07 ·/}).click();
+    const notice = view.locator('.proposal').filter({hasText:'Atualizar · U07'});
+    await notice.getByText(/Confirmar se a comunicação já foi feita pelo cartório/).waitFor();
+    assert.equal((await db.doc('estates/regina/tasks/U07').get()).get('version'),1);
+    await notice.getByRole('button',{name:'Aprovar e gravar',exact:true}).click();
+    await notice.getByText('Gravada',{exact:true}).waitFor();
+    const bank = await db.doc('estates/regina/tasks/U07').get();
+    assert.equal(bank.get('statusCode'),'nao_iniciado');
+    assert.match(bank.get('nextAction'),/pelo cartório.*Se ainda não foi feita.*Verificar contratos e débitos automáticos/);
+    assert.equal((await db.doc('estates/regina/tasks/U05').get()).get('version'),1);
+    assert.equal((await db.doc('estates/regina/tasks/U06').get()).get('version'),1);
+    assert.equal((await db.doc('estates/regina/tasks/U08').get()).get('version'),1);
     await view.getByRole('textbox',{name:'Texto da atualização'}).fill('Texto de exemplo sem envio.');
     await nav(manager,'Painel');
     await manager.getByRole('link',{name:'33 Total sem canceladas'}).waitFor();

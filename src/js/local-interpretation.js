@@ -1,7 +1,7 @@
 
 import { EMPTY, TASK_ID, diff, normalize, validateTask } from './model.js';
 import { candidates, duplicates } from './ai.js';
-import { conditionalNotifications, generalTaskStatus, incorporatedIn, matchLocalTasks, relatedTaskMatches } from './local-task-intent.js';
+import { conditionalNoticeChoices, conditionalNotifications, generalTaskStatus, incorporatedIn, matchLocalTasks, relatedTaskMatches } from './local-task-intent.js';
 
 const services = [
   {name:'Claro/NET', match:/\b(?:claro|net|tv a cabo)\b/, cancellation:'P01'},
@@ -217,10 +217,16 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
     }
     if (/^(?:(?:a gente|eu|nos)\s+)?nao\s+(?:vou|vai|vamos)\s+(?:mexer|mudar|alterar|meter a mao)\b/.test(clause)) continue;
     if (/^se\b/.test(clause) || /\b(?:se|caso)\s+(?:a|o|p[0-9])/.test(clause) && taskIds.length > 1) {
-      const related = relatedTaskMatches(input,tasks).slice(0,3).map((task) => task.id);
-      proposals.push({...information(related.length
+      const related = relatedTaskMatches(input,tasks).slice(0,3);
+      const choices = conditionalNoticeChoices(clause,originalClause,related).map(({task,nextAction}) => ({
+        operation:'update',taskId:task.id,base:task,values:validateTask({...task,nextAction},task.id,known),
+        reason:'Conferir se já houve aviso antes de entrar em contato.',confidence:'medium',decision:'pending'
+      }));
+      proposals.push({...information(choices.length ? 'Escolha a pendência para revisar a sugestão de conferir o aviso.'
+        : related.length
         ? 'A ação depende de confirmação. Abra a pendência correspondente para conferir os detalhes.'
-        : 'A mudança foi descrita como condicional. Confirme o que já aconteceu e indique a ação que deve ser aplicada.'),candidateIds:related});
+        : 'A mudança foi descrita como condicional. Confirme o que já aconteceu e indique a ação que deve ser aplicada.'),
+        candidateIds:related.map((task) => task.id),choices});
       continue;
     }
     if (incorporated) {

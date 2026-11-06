@@ -504,6 +504,21 @@ document.addEventListener('click',(event) => {
   }
   if (action === 'speech-start') startSpeech();
   if (action === 'speech-stop') stopSpeech();
+  if (canSuggest() && action === 'choose-proposal') {
+    const update = state.update;
+    if (update.listening || update.saving) return;
+    if (update.text.trim() !== update.batchText) return alertMessage('O texto mudou. Analise novamente antes de escolher a pendência.');
+    const choice = update.proposals[i]?.choices?.find(({taskId}) => taskId === source.dataset.taskId);
+    if (!choice) return;
+    if (update.proposals.some((item) => item.taskId === choice.taskId && ['pending','failed'].includes(item.decision))) {
+      return alertMessage('Essa pendência já tem uma proposta nesta revisão.');
+    }
+    update.proposals[i] = choice;
+    update.summary = 'Confira a mudança sugerida antes de gravar.';
+    state.notice = null;
+    paint();
+    app.querySelector('#proposal-' + i)?.focus();
+  }
   if (canSuggest() && ['edit-proposal','rebase-proposal'].includes(action)) editProposal(i,action === 'rebase-proposal');
   if (canSuggest() && action === 'accept-proposal') acceptProposal(i);
   if (canSuggest() && action === 'reject-proposal' && state.update.proposals[i]) {
