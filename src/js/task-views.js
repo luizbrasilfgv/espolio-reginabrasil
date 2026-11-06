@@ -3,7 +3,7 @@ import { TOPICS, PRIORITIES, STATUSES, GROUPS, FIELDS, SOURCES, aggregate, filte
 import { h, icon, route, taskRoute, btn, go, empty, header, select, input } from './ui.js';
 
 const STATUS_ICONS = {total:'list', resolved:'check', scheduled:'calendar', open:'clock', closed_other:'list'};
-const kpi = (key, count) => '<a class="panel kpi" href="' + route('pendencias', {group:key === 'total' ? '' : key, archive:'all'})
+const kpi = (key, count) => '<a class="panel kpi" href="' + route('pendencias', {group:key, archive:'all'})
   + '">' + icon(STATUS_ICONS[key]) + '<strong>' + count + '</strong><span class="small muted">' + GROUPS[key] + '</span></a>';
 const status = (task) => '<span class="chip ' + group(task) + '">' + h(STATUSES[task.statusCode]) + '</span>';
 const priority = (task) => '<span class="chip ' + h(task.priority) + '">' + h(PRIORITIES[task.priority]) + '</span>';
@@ -41,15 +41,15 @@ export function dashboard(state) {
     + '<div class="kpis">' + ['total','resolved','scheduled','open', ...(totals.closed_other ? ['closed_other'] : [])].map((key) => kpi(key, totals[key])).join('') + '</div>'
     + '<section class="panel progress-box"><div class="row spread"><h2>Progresso geral</h2><strong>' + percent.toLocaleString('pt-BR',{maximumFractionDigits:1})
     + '% concluído</strong></div><progress aria-label="Percentual de pendências resolvidas" max="100" value="' + percent + '"></progress></section>'
-    + '<div class="cols dashboard-cols"><section class="panel"><h2>Por assunto</h2><p class="small muted">Total e resolvidas em cada área.</p>'
-    + Object.entries(topics).map(([key, n]) => '<a class="topic-row" href="' + route('pendencias', {topic:key,archive:'all'})
+    + '<div class="cols dashboard-cols"><section class="panel"><h2>Por assunto</h2><p class="small muted">Total sem canceladas e resolvidas em cada área.</p>'
+    + Object.entries(topics).map(([key, n]) => '<a class="topic-row" href="' + route('pendencias', {topic:key,group:'total',archive:'all'})
       + '"><span class="row spread"><span>' + h(TOPICS[key]) + '</span><small><strong>' + n.total + '</strong> · ' + n.resolved
       + ' resolv.</small></span><span class="bar" aria-hidden="true"><span style="width:' + n.total / max * 100 + '%"><i style="width:'
       + (n.total ? n.resolved / n.total * 100 : 0) + '%"></i></span></span></a>').join('')
     + '</section><section class="panel"><h2>Radar de prioridades</h2><p class="small muted">Atalhos para as pendências em andamento.</p><div class="radar">'
     + radar.map(([label, f]) => '<a href="' + h(route('pendencias', f)) + '"><strong>' + filterTasks(live, f, state.user.uid, today).length + '</strong>' + label + '</a>').join('')
     + '</div><h3 style="margin-top:16px">Prioridade operacional</h3><div class="row">'
-    + Object.entries(priorities).map(([k,n]) => go(h(PRIORITIES[k]) + ' · ' + n, route('pendencias',{priority:k,archive:'all'}))).join('') + '</div></section></div>'
+    + Object.entries(priorities).map(([k,n]) => go(h(PRIORITIES[k]) + ' · ' + n, route('pendencias',{priority:k,group:'total',archive:'all'}))).join('') + '</div></section></div>'
     + '<div class="cols">' + queues.map(([title, rows, desc]) => '<section class="panel"><h2>' + h(title) + '</h2>'
       + compact(rows.sort((a,b) => (a.dueDate || 'z').localeCompare(b.dueDate || 'z')).slice(0,4), 'Nenhum item nesta fila.', desc) + '</section>').join('') + '</div>'
     + '<div class="cols"><section class="panel"><h2>Vínculos gerenciais</h2><p class="muted small">Informações relacionadas que podem avançar em paralelo.</p>'
@@ -78,7 +78,7 @@ export function taskList(state, filters) {
     + '</div><form id="filters" class="toolbar">' + input('Buscar pendências', 'q', filters.q, 'placeholder="Ex.: P11, Naturgy ou reembolso" maxlength="120"', 'search')
     + '<details' + (Object.keys(filters).some((k) => k !== 'q') ? ' open' : '') + '><summary>Filtros combináveis</summary><div class="form-grid">'
     + select('Assunto','topic',TOPICS,filters.topic,'Todos os assuntos') + select('Situação','statusCode',STATUSES,filters.statusCode,'Todas as situações')
-    + select('Grupo','group',Object.fromEntries(Object.entries(GROUPS).filter(([k])=>k!=='total')),filters.group,'Todos os grupos')
+    + select('Grupo','group',{...GROUPS,total:'Não canceladas'},filters.group,'Todos os grupos')
     + select('Prioridade','priority',PRIORITIES,filters.priority,'Todas as prioridades')
     + select('Responsável','owner',{mine:'Minhas pendências',none:'Sem responsável',...owners},filters.owner,'Todos os responsáveis')
     + select('Prazo','due',{week:'Próximos 7 dias',overdue:'Vencidas',none:'Sem prazo'},filters.due,'Todos os prazos')

@@ -187,6 +187,14 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     assert.equal((await db.doc('estates/regina/tasks/P13').get()).get('statusCode'),'cancelado');
     assert.equal((await db.doc('estates/regina/tasks/P04').get()).get('version'),1);
     await view.getByRole('textbox',{name:'Texto da atualização'}).fill('Texto de exemplo sem envio.');
+    await nav(manager,'Painel');
+    await manager.getByRole('link',{name:'33 Total sem canceladas'}).waitFor();
+    await manager.getByText('12,1% concluído',{exact:true}).waitFor();
+    await manager.getByRole('link',{name:'33 Total sem canceladas'}).click();
+    await manager.getByText('33 pendência(s)',{exact:true}).waitFor();
+    await nav(manager,'Painel');
+    await manager.getByRole('link',{name:'1 Canceladas'}).click();
+    await manager.getByText('P13',{exact:true}).waitFor();
     await nav(manager,'Mais');
     await manager.getByRole('link',{name:'Relatórios e exportação'}).click();
     const report = await manager.locator('#whatsapp').inputValue();

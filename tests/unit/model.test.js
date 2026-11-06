@@ -25,6 +25,19 @@ test('seed completo, estados distintos e distribuição exata',() => {
   assert.equal(get('P11').dueDate,null);
   assert.equal(seed.every((t) => !t.blockedByIds.length),true);
 });
+test('canceladas ficam no histórico e saem do total, do progresso e das distribuições de trabalho',() => {
+  const cancelled = {...get('P13'),statusCode:'cancelado'};
+  const tasks = seed.map((task) => task.id === cancelled.id ? cancelled : task);
+  const result = aggregate(tasks);
+  assert.deepEqual(result.totals,{total:33,resolved:3,scheduled:1,open:29,closed_other:1});
+  assert.deepEqual(result.topics.imovel_contas,{total:8,resolved:3});
+  assert.equal(result.priorities.proximos_dias,12);
+  assert.equal(result.statuses.cancelado,1);
+  assert.equal(result.percent,300 / 33);
+  assert.equal(aggregate([cancelled]).percent,0);
+  assert.equal(filterTasks(tasks,{group:'total',archive:'all'},'test').length,33);
+  assert.deepEqual(filterTasks(tasks,{group:'closed_other',archive:'all'},'test'),[cancelled]);
+});
 test('busca acentuada, filtros combinados, atraso e arquivo',() => {
   const filter = (filters) => filterTasks(seed,filters,'test','2026-11-06').map((t) => t.id);
   assert.deepEqual(filter({q:'P11'}),['P11']);

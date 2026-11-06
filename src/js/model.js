@@ -19,7 +19,7 @@ export const SOURCES = {
   documento: 'Documento', relato_familiar: 'Relato familiar', resposta_terceiro: 'Resposta de terceiro',
   inferencia_ia: 'Inferência da IA', indefinido: 'A confirmar'
 };
-export const GROUPS = { total: 'Total', open: 'Em aberto', scheduled: 'Agendadas', resolved: 'Resolvidas', closed_other: 'Canceladas' };
+export const GROUPS = { total: 'Total sem canceladas', open: 'Em aberto', scheduled: 'Agendadas', resolved: 'Resolvidas', closed_other: 'Canceladas' };
 export const ROLES = { admin: 'Administrador', editor: 'Editor', viewer: 'Leitor' };
 export const ACCESS = { active: 'Ativo', suspended: 'Suspenso', revoked: 'Revogado' };
 export const FIELDS = {
@@ -117,26 +117,29 @@ export function validateTask(input, id, knownIds) {
   return clean;
 }
 export function aggregate(tasks) {
-  const totals = {total: tasks.length, resolved: 0, scheduled: 0, open: 0, closed_other: 0};
+  const totals = {total: 0, resolved: 0, scheduled: 0, open: 0, closed_other: 0};
   const topics = Object.fromEntries(Object.keys(TOPICS).map((k) => [k, {total: 0, resolved: 0}]));
   const priorities = Object.fromEntries(Object.keys(PRIORITIES).map((k) => [k, 0]));
   const statuses = Object.fromEntries(Object.keys(STATUSES).map((k) => [k, 0]));
   for (const task of tasks) {
     const kind = group(task);
     totals[kind]++;
+    statuses[task.statusCode]++;
+    if (kind === 'closed_other') continue;
+    totals.total++;
     topics[task.topic].total++;
     if (kind === 'resolved') topics[task.topic].resolved++;
     priorities[task.priority]++;
-    statuses[task.statusCode]++;
   }
-  return {totals, topics, priorities, statuses, percent: tasks.length ? 100 * totals.resolved / tasks.length : 0};
+  return {totals, topics, priorities, statuses, percent: totals.total ? 100 * totals.resolved / totals.total : 0};
 }
 export function filterTasks(tasks, filters, uid, today = localDate()) {
   const term = normalize(filters.q).trim();
   return tasks.filter((task) => {
     if ((filters.archive || 'active') === 'active' && task.archived) return false;
     if (filters.archive === 'archived' && !task.archived) return false;
-    if (filters.group && group(task) !== filters.group) return false;
+    if (filters.group === 'total' && group(task) === 'closed_other') return false;
+    if (filters.group && filters.group !== 'total' && group(task) !== filters.group) return false;
     for (const key of ['topic','priority','statusCode']) if (filters[key] && task[key] !== filters[key]) return false;
     if (filters.owner === 'mine' && task.ownerUid !== uid) return false;
     if (filters.owner === 'none' && (task.ownerUid || task.ownerLabel)) return false;
