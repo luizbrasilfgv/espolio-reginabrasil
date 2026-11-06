@@ -1,7 +1,7 @@
 
 import { EMPTY, TASK_ID, diff, normalize, validateTask } from './model.js';
 import { candidates, duplicates } from './ai.js';
-import { conditionalNotifications, generalTaskStatus, incorporatedIn, matchLocalTasks } from './local-task-intent.js';
+import { conditionalNotifications, generalTaskStatus, incorporatedIn, matchLocalTasks, relatedTaskMatches } from './local-task-intent.js';
 
 const services = [
   {name:'Claro/NET', match:/\b(?:claro|net|tv a cabo)\b/, cancellation:'P01'},
@@ -215,6 +215,7 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
       }
       continue;
     }
+    if (/^(?:(?:a gente|eu|nos)\s+)?nao\s+(?:vou|vai|vamos)\s+(?:mexer|mudar|alterar|meter a mao)\b/.test(clause)) continue;
     if (/^se\b/.test(clause) || /\b(?:se|caso)\s+(?:a|o|p[0-9])/.test(clause) && taskIds.length > 1) {
       proposals.push(information('A mudança foi descrita como condicional. Confirme o que já aconteceu e indique a ação que deve ser aplicada.'));
       continue;
@@ -371,11 +372,15 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
     }
   }
   if (unmatched || !proposals.length) {
-    const related = candidates(input,tasks).filter((task) => !seen.has(task.id)).slice(0,3).map((task) => task.id);
+    const matches = relatedTaskMatches(input,tasks);
+    const related = (matches.length ? matches : candidates(input,tasks))
+      .filter((task) => !seen.has(task.id)).slice(0,3).map((task) => task.id);
     proposals.push({...information(proposals.length ? 'Alguns trechos ainda precisam de esclarecimento. Diga qual pendência e o que deve mudar.'
-      : 'Não encontrei uma alteração para aprovar. Diga o assunto e o que aconteceu ou indique o ID da pendência.'),candidateIds:related});
+      : related.length ? 'Encontrei possíveis pendências relacionadas. Abra uma delas para conferir os detalhes.'
+        : 'Não encontrei uma alteração nem uma pendência relacionada.'),candidateIds:related});
   }
   return {summary:conditionalNotice ? 'A proposta é conferir se já houve aviso e só entrar em contato se for necessário.'
-    : 'Confira as sugestões abaixo e decida o que fazer em cada uma.',
+    : proposals.some((item) => item.values) ? 'Confira as sugestões abaixo e decida o que fazer em cada uma.'
+      : 'Veja abaixo o que a análise encontrou. Nenhuma alteração foi gravada.',
     proposals,localService:context?.name ?? null,localTaskId:lastTask?.id ?? null};
 }

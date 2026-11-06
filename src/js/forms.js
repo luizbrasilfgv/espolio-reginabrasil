@@ -76,14 +76,18 @@ function proposalView(state, item, i) {
   const clickable = ['pending','failed'].includes(item.decision);
   const id = item.taskId || item.base?.id;
   const label = item.reviewLabel || operationLabels[item.operation];
-  const title = item.values ? label + ' · ' + (id || 'Nova pendência') : (id ? 'Acompanhar ' + id : 'Esclarecer o relato');
   const related = [...new Set([...(item.candidateIds || []), ...(!item.values && id ? [id] : [])])];
+  const title = item.values ? label + ' · ' + (id || 'Nova pendência')
+    : id ? 'Acompanhar ' + id : related.length ? 'Pendências relacionadas ao relato' : 'Esclarecer o relato';
   return '<section id="proposal-' + i + '" class="panel stack proposal" tabindex="-1" data-decision="' + h(item.decision) + '"><div class="row spread"><h2>'
     + h(title) + '</h2><span class="chip">' + h(decisions[item.decision]) + '</span></div>'
     + (item.values ? '<p class="wrap"><strong>' + h(item.values.title) + '</strong></p>' : '')
     + '<p class="wrap">' + h(item.reason) + '</p>'
     + (item.values && item.confidence ? '<p class="small muted">Confiança da interpretação: ' + h(confidence[item.confidence]) + '.</p>' : '')
-    + (related.length ? '<div class="row">' + related.map((id) => go('Abrir ' + h(id),route('pendencia/' + id),'ghost')).join('') + '</div>' : '')
+    + (related.length ? '<div class="row">' + related.map((id) => {
+      const task = state.tasks?.find((task) => task.id === id);
+      return go(h(task ? id + ' · ' + task.title : 'Abrir ' + id),route('pendencia/' + id));
+    }).join('') + '</div>' : '')
     + banner(item.clarificationQuestion) + banner(item.error,'error')
     + (item.values ? diffHtml(item.base,item.values,state.names) : '')
     + (item.operation === 'split' ? '<h3>Nova pendência do desdobramento</h3>' + diffHtml(null,item.newTask,state.names) : '')

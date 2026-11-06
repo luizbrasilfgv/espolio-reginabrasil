@@ -205,6 +205,20 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     await water.getByText('Gravada',{exact:true}).waitFor();
     assert.equal((await db.doc('estates/regina/tasks/P13').get()).get('statusCode'),'cancelado');
     assert.equal((await db.doc('estates/regina/tasks/P04').get()).get('version'),1);
+    await view.getByRole('button',{name:'Nova fala',exact:true}).click();
+    await editor.fill('A gente não vai mexer com fatura de cartão nem débito automático. A pendência que ainda tem é a gente avisar os bancos mas eu não vou mexer em nada de cartão a não ser que o cartório já tenha comunicado.');
+    await view.getByRole('button',{name:'Analisar e mostrar alterações'}).click();
+    const matches = view.locator('.proposal').filter({hasText:'Pendências relacionadas ao relato'});
+    await matches.getByRole('link',{name:'U05 · Banco Aurora — comunicação e extratos'}).waitFor();
+    assert.deepEqual(await matches.getByRole('link').allTextContents(),[
+      'U05 · Banco Aurora — comunicação e extratos',
+      'U06 · Banco Serra — comunicação e aplicações',
+      'U07 · Vale — comunicação e contratos'
+    ]);
+    assert.equal(await view.getByRole('button',{name:'Aprovar e gravar',exact:true}).count(),0);
+    await matches.getByRole('link',{name:/^U07 ·/}).click();
+    await heading(view,'Vale — comunicação e contratos');
+    await nav(view,'Atualizar');
     await view.getByRole('textbox',{name:'Texto da atualização'}).fill('Texto de exemplo sem envio.');
     await nav(manager,'Painel');
     await manager.getByRole('link',{name:'33 Total sem canceladas'}).waitFor();

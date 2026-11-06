@@ -5,11 +5,21 @@ import { readFile } from 'node:fs/promises';
 import { EMPTY } from '../../src/js/model.js';
 import { confirmation } from '../../src/js/ai.js';
 import { interpretLocally } from '../../src/js/local-interpretation.js';
+import { relatedTaskMatches } from '../../src/js/local-task-intent.js';
 
 const seed = JSON.parse(await readFile(new URL('../fixtures/tasks.json',import.meta.url),'utf8'))
   .map((task) => ({...EMPTY,...task,version:1}));
 const parse = (text,tasks = seed,context) => interpretLocally(text,tasks,context).proposals;
 const changes = (items) => items.filter((item) => item.values);
+
+test('a busca cruza a ação pedida com o assunto e ignora a ação negada',() => {
+  const text = 'Não vamos avisar os bancos, precisamos entregar as cinzas à família.';
+  const tasks = seed.map((task) => task.id === 'U09' ? {...task,title:'Entrega das cinzas'} : task);
+  assert.deepEqual(relatedTaskMatches(text,tasks).map((task) => task.id),['U09']);
+  const items = parse('A gente não vai mexer com fatura de cartão nem débito automático. Falta avisar os bancos.',seed,'Claro/NET');
+  assert.deepEqual(changes(items),[]);
+  assert.deepEqual(items.flatMap(({candidateIds = []}) => candidateIds),['U05','U06','U07']);
+});
 
 test('um aviso condicional altera só a próxima ação dos destinatários mencionados',() => {
   const tasks = [

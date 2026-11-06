@@ -497,7 +497,7 @@ document.addEventListener('click',(event) => {
   if (['approve-editor','approve-viewer','reject-request','manage-member'].includes(action) && isAdmin()) manageDialog(action,uid);
   if (action === 'new-utterance') {
     stopSpeech(true);
-    Object.assign(state.update,{text:'',speechStatus:'',error:'',summary:'',proposals:[]});
+    Object.assign(state.update,{text:'',speechStatus:'',error:'',summary:'',proposals:[],localService:null,localTaskId:null});
     state.notice = null;
     paint();
     app.querySelector('[name="transcript"]')?.focus();

@@ -38,27 +38,27 @@
   },
   {
     "id": "U05",
-    "title": "Pendência de teste U05",
+    "title": "Banco Aurora — comunicação e extratos",
     "topic": "bancos_financas",
     "priority": "urgente",
     "statusCode": "nao_iniciado",
-    "nextAction": "Conferir a situação do item de teste."
+    "nextAction": "Comunicar falecimento e solicitar extratos."
   },
   {
     "id": "U06",
-    "title": "Pendência de teste U06",
+    "title": "Banco Serra — comunicação e aplicações",
     "topic": "bancos_financas",
     "priority": "urgente",
     "statusCode": "nao_iniciado",
-    "nextAction": "Conferir a situação do item de teste."
+    "nextAction": "Comunicar falecimento e solicitar orientação sobre aplicações."
   },
   {
     "id": "U07",
-    "title": "Pendência de teste U07",
+    "title": "Vale — comunicação e contratos",
     "topic": "bancos_financas",
     "priority": "urgente",
     "statusCode": "nao_iniciado",
-    "nextAction": "Conferir a situação do item de teste."
+    "nextAction": "Comunicar falecimento e verificar contratos e débitos automáticos."
   },
   {
     "id": "U08",

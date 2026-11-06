@@ -1,5 +1,5 @@
 
-import { TASK_ID, normalize } from './model.js';
+import { TASK_ID, TOPICS, normalize } from './model.js';
 
 const generic = new Set(('para com junto mesma mesmo cada sobre pelo pela esse essa este esta meus minhas voce agora depois ' +
   'pendencia tarefa conta cobranca pagamento pagar retirar guia fatura documento documentos processo parte caso ficou fazer ' +
@@ -23,6 +23,36 @@ export function matchLocalTasks(phrase, tasks) {
     .sort((a,b) => b.score - a.score || b.coverage - a.coverage);
   const best = matches[0];
   return best ? matches.filter(({score,coverage}) => score === best.score && coverage === best.coverage).map(({task}) => task) : [];
+}
+
+const searchActions = [
+  [/\b(?:avisar|notificar|comunicar|informar)\b/g, /\b(?:avisa\w*|aviso|notific\w*|comunic\w*|informar)\b/],
+  [/\b(?:enviar|mandar|entregar|encaminhar)\b/g, /\b(?:envi\w*|entreg\w*|encaminh\w*)\b/],
+  [/\b(?:pedir|solicitar|requerer)\b/g, /\b(?:pedir|solicit\w*|requer\w*|requisic\w*)\b/],
+  [/\b(?:pagar|quitar|liquidar)\b/g, /\b(?:pagar|pagamento|quit\w*|liquid\w*)\b/]
+];
+const searchStop = new Set('ainda agora hoje gente minha meu dele dela vai vou vamos preciso precisamos somente apenas'.split(' '));
+const actionBoundary = /[.!?;\n,]|\s+(?:mas|porem|se|caso|depois|enquanto|porque|quando|a nao ser que|e (?:nao|a gente|vamos|vou|preciso))\b/;
+const negatedAction = /\b(?:nao|nem|se)(?:\s+(?:vou|vai|vamos|quer|quero|precisa|precisamos|pretendo|pretendemos|devo|deve|ter que|tem que))*\s*$/;
+
+export function relatedTaskMatches(text, tasks) {
+  const report = normalize(text);
+  const intents = searchActions.flatMap(([spoken,registered]) => [...report.matchAll(spoken)].flatMap((match) => {
+    if (negatedAction.test(report.slice(Math.max(0,match.index - 55),match.index))) return [];
+    const object = report.slice(match.index + match[0].length).split(actionBoundary,1)[0].trim();
+    const subject = [...terms(object.split(/\s+/).slice(0,8).join(' '))].filter((word) => !searchStop.has(word));
+    return subject.length ? [{registered,subject}] : [];
+  }));
+  const ranked = tasks.flatMap((task) => {
+    if (task.archived || ['resolvido','cancelado'].includes(task.statusCode)) return [];
+    const actionText = normalize([task.title,task.nextAction].join(' '));
+    const heading = terms([task.title,TOPICS[task.topic]].join(' '));
+    const details = terms([task.description,task.nextAction].join(' '));
+    const score = Math.max(0,...intents.map(({registered,subject}) => registered.test(actionText)
+      ? subject.reduce((total,word) => total + (heading.has(word) ? 3 : details.has(word) ? 1 : 0),0) : 0));
+    return score ? [{task,score}] : [];
+  });
+  return ranked.sort((a,b) => b.score - a.score).map(({task}) => task);
 }
 
 export const unnecessary = /\b(?:nao faz sentido (?:ter|manter|deixar|abrir|criar)|nao (?:ha|tem|existe) (?:uma )?(?:conta|cobranca|fatura|pendencia|tarefa) (?:separada|individual|avulsa)|nao (?:precisa|precisamos) (?:mais )?(?:de|manter|ter|abrir|acompanhar)|(?:pode|podemos) (?:tirar|descartar|cancelar)|(?:deixou de ser|ficou) desnecessari[oa]|fica redundante)\b/;
