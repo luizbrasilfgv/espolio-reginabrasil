@@ -58,3 +58,46 @@ export function generalTaskStatus(clause, task) {
   if (/\b(?:iniciei|comecei|em andamento|dei entrada)\b/.test(clause)) return 'em_andamento';
   return null;
 }
+
+const limitedNotice = /\b(?:so|somente|apenas)\s+(?:(?:vamos|vou|vai)\s+)?(?:avisar|notificar|comunicar)\s+(.{2,100}?)\s*,?\s+se\s+(?:isso\s+se\s+)?/;
+const missingNotice = /^(?:(.{1,70}?)\s+)?nao\s+(?:tiver(?:em)?\s+sido|tenha(?:m)?\s+sido|foi|foram)\s+(?:avisad|notificad|comunicad)[oa]s?\b/;
+const collective = /^(?:(?:aos?|as?|os?)\s+)?(?:bancos|instituicoes|empresas|orgaos|fornecedores|escritorios|cartorios)$/;
+const recipientTypes = new Set('banco instituicao empresa orgao fornecedor escritorio cartorio'.split(' '));
+const directNotice = /^(?:Avisar|Comunicar|Notificar)\b.+?(?=\s+e\s+(?:solicitar|verificar|pedir|conferir|confirmar|levantar|acompanhar)\b|[.;]|$)/iu;
+
+export function conditionalNotifications(clause, original, tasks, prior = '') {
+  const action = limitedNotice.exec(clause);
+  if (!action) return null;
+  const context = clause.slice(0,action.index);
+  if (/\b(?:nao|talvez)(?:\s+(?:vamos|vai|vou))?\s*$/.test(context)) return null;
+  const after = action.index + action[0].length;
+  const condition = missingNotice.exec(clause.slice(after));
+  if (!condition) return null;
+  const subject = (condition[1] || '').replace(/\b(?:ja|ainda)\b/g,'').trim();
+  const withoutArticle = (value) => value.trim().replace(/^(?:aos?|as?|os?)\s+/,'');
+  if (subject && !/^(?:eles?|elas?)$/.test(subject) && withoutArticle(subject) !== withoutArticle(action[1])) return null;
+
+  const source = /^\s*(?:automaticamente\s+|previamente\s+)?(?:via|por|pel[oa]s?)\s+(.+?)(?:\s+ne\b|$)/.exec(clause.slice(after + condition[0].length));
+  const label = source?.[1].trim().replace(/^(?:o|a|os|as)\s+/,'');
+  const from = label ? clause.indexOf(label,after + condition[0].length) : -1;
+  const issuer = from >= 0 && original.length === clause.length ? original.slice(from,from + label.length) : label;
+  const verification = 'Confirmar se a comunicação já foi feita' + (issuer ? ' por ' + issuer : '') + '.';
+  const scope = collective.test(action[1].trim()) ? prior + ' ' + context : action[1];
+  const spoken = terms(scope);
+  const ids = new Set((normalize(scope).match(/\b[ups]\s*\d{2,6}\b/g) || []).map((id) => id.replace(/\s/g,'').toUpperCase()));
+
+  return tasks.flatMap((task) => {
+    const [recipient, subject] = task.title.split(/\s+[—–]\s+/);
+    const names = [...terms(recipient)].filter((word) => !recipientTypes.has(word));
+    const nameMatch = subject && names.length && names.every((word) => spoken.has(word));
+    if (!ids.has(task.id) && !nameMatch) return [];
+    if (task.nextAction.startsWith(verification)) return [{task,nextAction:task.nextAction}];
+    const step = directNotice.exec(task.nextAction);
+    if (!step) return [];
+    const rest = task.nextAction.slice(step[0].length).replace(/^(?:\s+e\s+|[.;]\s*)/iu,'').trim();
+    const instruction = step[0].charAt(0).toLowerCase() + step[0].slice(1);
+    const nextAction = verification + ' Se ainda não foi feita, ' + instruction + '.'
+      + (rest ? ' ' + rest.charAt(0).toUpperCase() + rest.slice(1) : '');
+    return nextAction.length <= 1000 ? [{task,nextAction}] : [];
+  });
+}

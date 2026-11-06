@@ -11,6 +11,27 @@ const seed = JSON.parse(await readFile(new URL('../fixtures/tasks.json',import.m
 const parse = (text,tasks = seed,context) => interpretLocally(text,tasks,context).proposals;
 const changes = (items) => items.filter((item) => item.values);
 
+test('um aviso condicional altera só a próxima ação dos destinatários mencionados',() => {
+  const tasks = [
+    {...EMPTY,id:'U05',title:'Banco Aurora — comunicação e extratos',nextAction:'Comunicar falecimento; solicitar extratos.'},
+    {...EMPTY,id:'U06',title:'Banco Serra — comunicação e contas',nextAction:'Comunicar falecimento e verificar contas.'},
+    {...EMPTY,id:'U07',title:'Banco Vale — comunicação e aplicações',nextAction:'Comunicar falecimento e solicitar extratos.'},
+    {...EMPTY,id:'U08',title:'Fatura de cartão',nextAction:'Conferir a fatura.'}
+  ];
+  const text = 'a gente não vai mexer com fatura de cartão se está com débito automático não vai organizar pagamento de nenhum cartão do banco Aurora Serra a gente vai deixar rolar e vai só avisar os bancos se isso se os bancos já não tiverem sido avisados automaticamente via cartório né';
+  const items = changes(parse(text,tasks));
+  assert.deepEqual(items.map((item) => item.taskId),['U05','U06']);
+  const conditional = 'Confirmar se a comunicação já foi feita por cartório. Se ainda não foi feita, comunicar falecimento.';
+  assert.deepEqual(items.map((item) => ({id:item.taskId,...item.values})),[
+    {...tasks[0],nextAction:conditional + ' Solicitar extratos.'},
+    {...tasks[1],nextAction:conditional + ' Verificar contas.'}
+  ]);
+  assert.equal(changes(parse('Só avisar o Banco Aurora se o Banco Serra não tiver sido avisado.',tasks)).length,0);
+  assert.equal(changes(parse('Só avisar o Banco Aurora se ele ainda não tiver sido avisado?',tasks)).length,0);
+  const updated = tasks.map((task) => ({...task,...items.find((item) => item.taskId === task.id)?.values}));
+  assert.equal(changes(parse(text,updated)).length,0);
+});
+
 test('Claro reconhece a conclusão e acrescenta a observação, mantendo a proposta sem gravar',() => {
   const [item] = changes(parse('A internet e a TV a cabo da Claro Net já está resolvido. Já estou com o documento aqui.'));
   assert.equal(item.taskId,'P01');

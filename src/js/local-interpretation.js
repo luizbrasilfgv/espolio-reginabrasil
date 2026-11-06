@@ -1,7 +1,7 @@
 
 import { EMPTY, TASK_ID, diff, normalize, validateTask } from './model.js';
 import { candidates, duplicates } from './ai.js';
-import { generalTaskStatus, incorporatedIn, matchLocalTasks } from './local-task-intent.js';
+import { conditionalNotifications, generalTaskStatus, incorporatedIn, matchLocalTasks } from './local-task-intent.js';
 
 const services = [
   {name:'Claro/NET', match:/\b(?:claro|net|tv a cabo)\b/, cancellation:'P01'},
@@ -131,6 +131,7 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
     ? tasks.find((task) => task.id === previousTaskId) : null;
   let offset = 0;
   let previousClause = '';
+  let conditionalNotice = false;
   const original = input.normalize('NFC');
 
   function add(base, status, title, nextAction, reason, key, fields = {}) {
@@ -194,10 +195,24 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
     const continued = /^(?:ela|ele|isso|essa|esse|ja vem|vem|esta|ta)\b/.test(clause);
     const question = text[offset] === '?';
     const incorporated = !question && incorporatedIn(continued ? previousClause + ' ' + clause : clause);
+    const notices = !question && conditionalNotifications(clause,originalClause,tasks.filter((task) => !isClosed(task)),previousClause);
     previousClause = question ? '' : clause;
     if (question) {
       const options = matchLocalTasks(clause,tasks).map((task) => task.id);
       proposals.push({...information('A fala está em forma de pergunta. Confirme o que aconteceu para propor uma alteração.'),candidateIds:options});
+      continue;
+    }
+    if (notices) {
+      conditionalNotice = true;
+      if (!notices.length) {
+        proposals.push(information('Entendi que o aviso depende de uma conferência. Diga para quem seria o aviso ou indique a pendência que contém essa ação.'));
+      } else if (notices.every(({task,nextAction}) => task.nextAction === nextAction)) {
+        proposals.push({...information('A conferência antes do aviso já consta nas pendências indicadas.'),candidateIds:notices.map(({task}) => task.id)});
+      } else {
+        for (const {task,nextAction} of notices) {
+          add(task,null,task.title,nextAction,'Conferir se já houve aviso antes de entrar em contato.',task.id,{nextAction});
+        }
+      }
       continue;
     }
     if (/^se\b/.test(clause) || /\b(?:se|caso)\s+(?:a|o|p[0-9])/.test(clause) && taskIds.length > 1) {
@@ -360,6 +375,7 @@ export function interpretLocally(input, tasks, previousService, previousTaskId) 
     proposals.push({...information(proposals.length ? 'Alguns trechos ainda precisam de esclarecimento. Diga qual pendência e o que deve mudar.'
       : 'Não encontrei uma alteração para aprovar. Diga o assunto e o que aconteceu ou indique o ID da pendência.'),candidateIds:related});
   }
-  return {summary:'Confira as sugestões abaixo e decida o que fazer em cada uma.',
+  return {summary:conditionalNotice ? 'A proposta é conferir se já houve aviso e só entrar em contato se for necessário.'
+    : 'Confira as sugestões abaixo e decida o que fazer em cada uma.',
     proposals,localService:context?.name ?? null,localTaskId:lastTask?.id ?? null};
 }
