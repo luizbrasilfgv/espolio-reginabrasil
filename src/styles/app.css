@@ -83,6 +83,16 @@ progress::-moz-progress-bar { background: var(--accent); }
 .compact-list a:hover { text-decoration: underline; }
 .toolbar { display: grid; gap: 10px; }
 .toolbar .row .btn { font-size: .87rem; }
+.task-shortcuts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 14px; }
+.task-shortcuts h2 { margin: 0; font-size: 1rem; }
+.task-shortcuts .btn { font-size: .87rem; }
+.task-toolbar { padding: 10px 12px; }
+.task-toolbar form { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 12px; }
+.task-toolbar form:has(details[open]) { grid-template-columns: minmax(0,1fr); }
+.task-toolbar summary { padding-inline: 10px; }
+.task-toolbar details[open] .form-grid, .filter-actions { margin-top: 8px; }
+.active-filters { margin-top: 8px; font-size: .85rem; }
+.active-filters a { display: inline-flex; align-items: center; min-height: 44px; }
 .form-grid { display: grid; gap: 12px; }
 label { display: grid; gap: 5px; font-weight: 600; min-width: 0; }
 input:not([type="checkbox"]), textarea, select { display: block; width: 100%; min-width: 0; color: var(--ink); background: #fff; border: 1px solid #aab8af; border-radius: 8px; padding: 8px 10px; }

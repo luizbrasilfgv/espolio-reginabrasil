@@ -102,9 +102,13 @@ function paint(focus = false) {
   if (focus) app.querySelector('h1, main')?.focus({preventScroll:true});
 }
 function refresh() {
-  if (dialog.open || app.contains(document.activeElement) && document.activeElement.matches('textarea,input,select')) {
+  if (dialog.open || app.querySelector('#filters details[open]')
+    || app.contains(document.activeElement) && document.activeElement.matches('textarea,input,select')) {
     const results = app.querySelector('#task-results');
-    if (results && state.tasks) results.innerHTML = taskResults(state,filtersFrom(app.querySelector('#filters')));
+    if (results && state.tasks) {
+      const q = app.querySelector('#filters [name=q]').value;
+      results.innerHTML = taskResults(state,{...page.filters,q});
+    }
     return;
   }
   paint();
@@ -528,7 +532,7 @@ document.addEventListener('input',(event) => {
   }
   if (field.form?.id === 'filters' && field.name === 'q') {
     const result = app.querySelector('#task-results');
-    if (result && state.tasks) result.innerHTML = taskResults(state,filtersFrom(field.form));
+    if (result && state.tasks) result.innerHTML = taskResults(state,{...page.filters,q:field.value});
   }
 });
 document.addEventListener('submit',(event) => {

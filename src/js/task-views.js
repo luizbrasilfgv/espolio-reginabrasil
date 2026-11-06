@@ -25,12 +25,18 @@ export function dashboard(state) {
     ['Providências desta semana', filterTasks(live, {due:'week'}, state.user.uid, today), (t) => dateLabel(t.dueDate) + ' · ' + t.nextAction]
   ];
   const radar = [
-    ['Vencidas', {due:'overdue'}, ''],
-    ['Próximos 7 dias', {due:'week'}, ''],
-    ['Aguardando terceiros', {view:'waiting'}, ''],
-    ['Sem responsável', {owner:'none'}, ''],
-    ['Dependem de outra ação', {view:'blocked'}, ''],
-    ['Pendências críticas', {view:'critical'}, '']
+    ['Vencidas', {group:'pending',due:'overdue'}],
+    ['Próximos 7 dias', {group:'pending',due:'week'}],
+    ['Aguardando terceiros', {group:'pending',view:'waiting'}],
+    ['Sem responsável', {group:'pending',owner:'none'}],
+    ['Dependem de outra ação', {group:'pending',view:'blocked'}],
+    ['Pendências críticas', {group:'pending',view:'critical'}]
+  ];
+  const shortcuts = [
+    ['Próximos 7 dias', {group:'pending',due:'week'}],
+    ['Urgentes', {group:'pending',priority:'urgente'}],
+    ['Em aberto', {group:'open'}],
+    ['Minhas pendências', {group:'pending',owner:'mine'}]
   ];
   const max = Math.max(1, ...Object.values(topics).map((v) => v.total));
   const changes = (state.events || []).filter((e) => e.channel !== 'initial_import');
@@ -39,6 +45,9 @@ export function dashboard(state) {
   return header('Visão geral', 'Painel do espólio', 'Acompanhe pendências, prazos e as últimas mudanças.',
     state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : '')
     + '<div class="kpis">' + ['total','resolved','scheduled','open', ...(totals.closed_other ? ['closed_other'] : [])].map((key) => kpi(key, totals[key])).join('') + '</div>'
+    + '<section class="panel task-shortcuts"><h2>Pendências de agora</h2><div class="row">'
+    + shortcuts.map(([label, filters]) => go(h(label) + ' · ' + filterTasks(tasks, filters, state.user.uid, today).length,
+      route('pendencias', filters))).join('') + '</div></section>'
     + '<section class="panel progress-box"><div class="row spread"><h2>Progresso geral</h2><strong>' + percent.toLocaleString('pt-BR',{maximumFractionDigits:1})
     + '% concluído</strong></div><progress aria-label="Percentual de pendências resolvidas" max="100" value="' + percent + '"></progress></section>'
     + '<div class="cols dashboard-cols"><section class="panel"><h2>Por assunto</h2><p class="small muted">Total sem canceladas e resolvidas em cada área.</p>'
@@ -47,7 +56,7 @@ export function dashboard(state) {
       + ' resolv.</small></span><span class="bar" aria-hidden="true"><span style="width:' + n.total / max * 100 + '%"><i style="width:'
       + (n.total ? n.resolved / n.total * 100 : 0) + '%"></i></span></span></a>').join('')
     + '</section><section class="panel"><h2>Radar de prioridades</h2><p class="small muted">Atalhos para as pendências em andamento.</p><div class="radar">'
-    + radar.map(([label, f]) => '<a href="' + h(route('pendencias', f)) + '"><strong>' + filterTasks(live, f, state.user.uid, today).length + '</strong>' + label + '</a>').join('')
+    + radar.map(([label, f]) => '<a href="' + h(route('pendencias', f)) + '"><strong>' + filterTasks(tasks, f, state.user.uid, today).length + '</strong>' + label + '</a>').join('')
     + '</div><h3 style="margin-top:16px">Prioridade operacional</h3><div class="row">'
     + Object.entries(priorities).map(([k,n]) => go(h(PRIORITIES[k]) + ' · ' + n, route('pendencias',{priority:k,group:'total',archive:'all'}))).join('') + '</div></section></div>'
     + '<div class="cols">' + queues.map(([title, rows, desc]) => '<section class="panel"><h2>' + h(title) + '</h2>'
@@ -64,7 +73,7 @@ export function dashboard(state) {
 }
 
 export function taskList(state, filters) {
-  const heads = header('Controle de trabalho', 'Pendências', 'Busque por ID, título ou assunto.',
+  const heads = header('Controle de trabalho', 'Pendências', '',
     state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : '');
   if (!state.tasks) return heads + empty('Carregando pendências…');
   const owners = {};
@@ -72,20 +81,30 @@ export function taskList(state, filters) {
     if (t.ownerUid) owners['uid:' + t.ownerUid] = state.names[t.ownerUid] || t.ownerLabel;
     else if (t.ownerLabel) owners['name:' + t.ownerLabel] = t.ownerLabel + ' (histórico)';
   }
-  return heads + '<section class="panel toolbar"><div class="row" aria-label="Filtros rápidos">'
-    + go('Minhas pendências', route('pendencias',{owner:'mine'})) + go('Aguardando terceiros', route('pendencias',{view:'waiting'}))
-    + go('Próximos 7 dias', route('pendencias',{due:'week'})) + go('Dependem de outra ação', route('pendencias',{view:'blocked'}))
-    + '</div><form id="filters" class="toolbar">' + input('Buscar pendências', 'q', filters.q, 'placeholder="Ex.: P11, Naturgy ou reembolso" maxlength="120"', 'search')
-    + '<details' + (Object.keys(filters).some((k) => k !== 'q') ? ' open' : '') + '><summary>Filtros combináveis</summary><div class="form-grid">'
-    + select('Assunto','topic',TOPICS,filters.topic,'Todos os assuntos') + select('Situação','statusCode',STATUSES,filters.statusCode,'Todas as situações')
-    + select('Grupo','group',{...GROUPS,total:'Não canceladas'},filters.group,'Todos os grupos')
-    + select('Prioridade','priority',PRIORITIES,filters.priority,'Todas as prioridades')
-    + select('Responsável','owner',{mine:'Minhas pendências',none:'Sem responsável',...owners},filters.owner,'Todos os responsáveis')
-    + select('Prazo','due',{week:'Próximos 7 dias',overdue:'Vencidas',none:'Sem prazo'},filters.due,'Todos os prazos')
-    + select('Fila','view',{waiting:'Aguardando terceiros',blocked:'Com bloqueio confirmado',critical:'Prioridade urgente'},filters.view,'Todas as filas')
-    + select('Arquivo','archive',{active:'Visíveis',archived:'Arquivadas',all:'Todas'},filters.archive || 'active')
-    + '</div></details><div class="row"><button type="submit" class="primary">Aplicar filtros</button>'
-    + go('Limpar', route('pendencias'), 'ghost') + '</div></form></section><div id="task-results">'
+  const fields = [
+    ['Assunto','topic',TOPICS,'Todos os assuntos'],
+    ['Situação','statusCode',STATUSES,'Todas as situações'],
+    ['Grupo','group',{...GROUPS,total:'Não canceladas',pending:'Em aberto ou agendadas'},'Todos os grupos'],
+    ['Prioridade','priority',PRIORITIES,'Todas as prioridades'],
+    ['Responsável','owner',{mine:'Minhas pendências',none:'Sem responsável',...owners},'Todos os responsáveis'],
+    ['Prazo','due',{week:'Próximos 7 dias',overdue:'Vencidas',none:'Sem prazo'},'Todos os prazos'],
+    ['Fila','view',{waiting:'Aguardando terceiros',blocked:'Com bloqueio confirmado',critical:'Prioridade urgente'},'Todas as filas'],
+    ['Arquivo','archive',{active:'Visíveis',archived:'Arquivadas',all:'Com arquivadas'},null]
+  ];
+  const active = fields.flatMap(([,key,options]) => {
+    const value = filters[key];
+    return value && value !== 'active' && Object.hasOwn(options,value) ? [options[value]] : [];
+  });
+  return heads + '<section class="panel task-toolbar"><form id="filters">'
+    + '<label class="task-search"><span class="sr-only">Buscar pendências</span><input type="search" name="q" value="' + h(filters.q)
+    + '" placeholder="Buscar por ID, título ou assunto" maxlength="120"></label>'
+    + '<details><summary>Filtros</summary><div class="form-grid">'
+    + fields.map(([label,key,options,blank]) => select(label,key,options,filters[key] || (key === 'archive' ? 'active' : ''),blank)).join('')
+    + '</div><div class="filter-actions"><button type="submit" class="primary">Aplicar filtros</button></div></details></form>'
+    + (active.length ? '<div class="row active-filters" aria-label="Filtros ativos">'
+      + active.map((label) => '<span class="chip">' + h(label) + '</span>').join('')
+      + '<a href="' + route('pendencias') + '">Limpar tudo</a></div>' : '')
+    + '</section><div id="task-results">'
     + taskResults(state, filters) + '</div>';
 }
 

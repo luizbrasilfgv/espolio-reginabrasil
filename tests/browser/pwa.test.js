@@ -97,6 +97,14 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     await manager.locator('.kpi').first().getByText('34',{exact:true}).waitFor();
     assert.deepEqual(await manager.locator('.kpi strong').allTextContents(),['34','3','1','30']);
     await manager.screenshot({path:out + '/desktop-1440.png'});
+    await manager.getByRole('link',{name:/^Urgentes ·/}).click();
+    await heading(manager,'Pendências');
+    await manager.getByText('Em aberto ou agendadas',{exact:true}).filter({visible:true}).waitFor();
+    assert.ok(await manager.locator('.task-row').count() > 0);
+    for (const row of await manager.locator('.task-row').allTextContents()) {
+      assert.match(row,/Urgente/);
+      assert.doesNotMatch(row,/Resolvido|Cancelado/);
+    }
     await nav(manager,'Mais');
     await manager.getByRole('link',{name:'Gestão de acessos'}).click();
     await manager.getByRole('button',{name:'Aprovar editor'}).click();
@@ -109,7 +117,18 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
       assert.ok(await view.evaluate(() => document.documentElement.scrollWidth <= innerWidth),String(width));
     }
     await view.setViewportSize({width:390,height:844});
-    await nav(view,'Pendências');
+    await view.getByRole('link',{name:/^Imóvel e contas/}).click();
+    await heading(view,'Pendências');
+    await view.getByText('9 pendência(s)',{exact:true}).waitFor();
+    assert.equal(await view.locator('#filters details').getAttribute('open'),null);
+    const firstTask = await view.locator('.task-row').first().boundingBox();
+    assert.ok(firstTask && firstTask.y + firstTask.height < 844);
+    await view.locator('#filters summary').click();
+    await view.locator('#filters select[name="group"]').selectOption('resolved');
+    await view.getByRole('button',{name:'Aplicar filtros'}).click();
+    await view.getByText('3 pendência(s)',{exact:true}).waitFor();
+    assert.equal(await view.locator('#filters details').getAttribute('open'),null);
+    await view.getByRole('link',{name:'Limpar tudo'}).click();
     await view.getByRole('searchbox',{name:'Buscar pendências'}).fill('P11');
     await view.locator('.task-row[href="#/pendencia/P11"]').click();
     await heading(view,'Naturgy — forma de pagamento e débito automático');

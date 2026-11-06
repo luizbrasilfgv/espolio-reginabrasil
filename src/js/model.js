@@ -20,6 +20,10 @@ export const SOURCES = {
   inferencia_ia: 'Inferência da IA', indefinido: 'A confirmar'
 };
 export const GROUPS = { total: 'Total sem canceladas', open: 'Em aberto', scheduled: 'Agendadas', resolved: 'Resolvidas', closed_other: 'Canceladas' };
+const groupFilters = {
+  total: (task) => group(task) !== 'closed_other',
+  pending: (task) => !closed(task)
+};
 export const ROLES = { admin: 'Administrador', editor: 'Editor', viewer: 'Leitor' };
 export const ACCESS = { active: 'Ativo', suspended: 'Suspenso', revoked: 'Revogado' };
 export const FIELDS = {
@@ -135,11 +139,12 @@ export function aggregate(tasks) {
 }
 export function filterTasks(tasks, filters, uid, today = localDate()) {
   const term = normalize(filters.q).trim();
+  const matchesGroup = Object.hasOwn(groupFilters, filters.group)
+    ? groupFilters[filters.group] : (task) => group(task) === filters.group;
   return tasks.filter((task) => {
     if ((filters.archive || 'active') === 'active' && task.archived) return false;
     if (filters.archive === 'archived' && !task.archived) return false;
-    if (filters.group === 'total' && group(task) === 'closed_other') return false;
-    if (filters.group && filters.group !== 'total' && group(task) !== filters.group) return false;
+    if (filters.group && !matchesGroup(task)) return false;
     for (const key of ['topic','priority','statusCode']) if (filters[key] && task[key] !== filters[key]) return false;
     if (filters.owner === 'mine' && task.ownerUid !== uid) return false;
     if (filters.owner === 'none' && (task.ownerUid || task.ownerLabel)) return false;
