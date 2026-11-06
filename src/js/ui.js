@@ -48,7 +48,7 @@ const nav = [
   ['atividade','Atividade','clock'], ['mais','Mais','more']
 ];
 export function shell(page, user, role, html, notice) {
-  const tab = ({pendencia:'pendencias',acessos:'mais',exportar:'mais',ajuda:'mais'})[page] || page;
+  const tab = ({pendencia:'pendencias',conciliar:'pendencias',acessos:'mais',exportar:'mais',ajuda:'mais'})[page] || page;
   return '<aside class="sidebar">' + brand() + '<nav class="nav" aria-label="Navegação principal">'
     + nav.map(([id,label,key]) => '<a href="' + route(id) + '"' + (id === tab ? ' aria-current="page"' : '')
       + (id === 'atualizar' ? ' class="nav-update"' : '') + '>' + icon(key) + '<span>' + label + '</span></a>').join('')

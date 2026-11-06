@@ -4,13 +4,14 @@ import { limit, orderBy, query, updateDoc } from 'firebase/firestore';
 import { auth, db, firebaseApp, aiOptions, emulator, configured, login, logout, finishLogin } from './firebase.js';
 import { EMPTY, ROLES, ACCESS, TASK_ID, diff, localDate, sensitive } from './model.js';
 import { col, ref, subscribeDoc, subscribeList, tasksQuery, eventsQuery, nextEvents,
-  canWrite, ConflictError, saveTask, requestAccess, manageAccess } from './store.js';
+  canWrite, ConflictError, saveTask, mergeTasks, requestAccess, manageAccess } from './store.js';
 import { h, icon, route, taskRoute, btn, banner, gate, shell, textarea, select, check } from './ui.js';
-import { dashboard, taskList, taskResults, detail, activity, diffHtml } from './task-views.js';
+import { dashboard, taskList, taskResults, reconciliation, detail, activity, diffHtml } from './task-views.js';
 import { taskFields, readTask, updateView, more, adminView, exportView, helpView } from './forms.js';
 import { interpret, confirmation, duplicates } from './ai.js';
 import { interpretLocally } from './local-interpretation.js';
 import { editedReview, rebaseReview, reviewItems } from './proposal-review.js';
+import { mergedTaskValues, pairKey } from './reconcile.js';
 import { shareText, exportJSON, exportCSV, download } from './exports.js';
 
 const app = document.querySelector('#app');
@@ -25,13 +26,13 @@ let authState = 'loading';
 let generalError = '';
 function fresh(user) {
   return {user,member:undefined,names:{},update:{text:'',consent:false,retain:false,proposals:[]},
-    activityFilters:{},taskPages:new Map(),history:{}};
+    activityFilters:{},taskPages:new Map(),history:{},ignoredPairs:new Set()};
 }
 state = fresh(null);
 function currentPage() {
   const [path,search=''] = location.hash.replace(/^#\/?/, '').split('?');
   if (path.startsWith('pendencia/')) return {name:'pendencia',id:path.slice('pendencia/'.length).toUpperCase(),filters:{}};
-  const routes = ['painel','pendencias','atividade','atualizar','mais','acessos','exportar','ajuda'];
+  const routes = ['painel','pendencias','conciliar','atividade','atualizar','mais','acessos','exportar','ajuda'];
   return {name:routes.includes(path)?path:'painel',filters:Object.fromEntries(new URLSearchParams(search))};
 }
 page = currentPage();
@@ -88,6 +89,7 @@ function paint(focus = false) {
     let body;
     switch (page.name) {
       case 'pendencias': body = taskList(state,page.filters); break;
+      case 'conciliar': body = reconciliation(state); break;
       case 'pendencia': body = detail(state,activeTask()); break;
       case 'atividade': body = activity(state); break;
       case 'atualizar': body = updateView(state,canAI(),!!Speech); break;
@@ -317,6 +319,26 @@ function manualReview(payload) {
     + '<div class="row">' + btn('Confirmar gravação','save-task','primary') + btn('Voltar à edição','back-task') + '</div>',
     {editing:true,payload});
 }
+function reviewMerge(key, primaryId) {
+  const ids = key.split(':');
+  const primary = state.tasks.find((task) => task.id === primaryId);
+  const duplicate = state.tasks.find((task) => task.id === ids.find((id) => id !== primaryId));
+  if (!primary || !duplicate || primary.archived || duplicate.archived || pairKey(primary,duplicate) !== key) return;
+  try {
+    const values = mergedTaskValues(primary,duplicate,state.tasks);
+    openModal('Revisar unificação', '<form id="merge-form" class="stack">'
+      + '<p>Manter <strong>' + h(primary.id + ' · ' + primary.title) + '</strong> e arquivar '
+      + '<strong>' + h(duplicate.id + ' · ' + duplicate.title) + '</strong>. O registro arquivado conserva o histórico.</p>'
+      + '<details><summary>Comparar as fichas originais</summary>'
+      + '<p>Em campos como situação e prioridade, vale a ficha que você escolheu manter.</p>'
+      + diffHtml(duplicate,primary,state.names) + '</details>'
+      + '<h3>Alterações na pendência principal</h3>' + diffHtml(primary,values,state.names)
+      + textarea('Próxima ação após unificar','nextAction',values.nextAction,'maxlength="1000" required')
+      + formButtons('Aprovar unificação') + '</form>',{editing:true,merge:{primary,duplicate,values}});
+  } catch (error) {
+    alertMessage(errorText(error),'error');
+  }
+}
 function manageDialog(action, uid) {
   const existing = state.members?.find((m) => m.uid === uid);
   const request = state.requests?.find((r) => r.uid === uid);
@@ -485,6 +507,11 @@ document.addEventListener('click',(event) => {
   if (action === 'new-task' && state.canEdit) openTask(null);
   if (action === 'edit-task' && state.canEdit && task) openTask(task);
   if (action === 'archive-task' && state.canEdit && task) manualReview({base:task,values:{...task,archived:!task.archived}});
+  if (action === 'review-merge' && canSuggest()) reviewMerge(source.dataset.pair,source.dataset.taskId);
+  if (action === 'ignore-pair' && state.canEdit) {
+    state.ignoredPairs.add(source.dataset.pair);
+    paint(true);
+  }
   if (action === 'back-task' && modal?.payload) openTask(modal.payload.base,modal.payload.values,false,modal.payload.reason);
   if (action === 'save-task' && state.canEdit && modal?.payload) {
     return void withResult(() => saveTask(db,state.user.uid,modal.payload),source,({id}) => {
@@ -581,6 +608,20 @@ document.addEventListener('submit',(event) => {
       return void withResult(() => updateDoc(ref(db,'config','app'),{
         aiEnabled:values.has('ai'),speechEnabled:values.has('speech'),allowManualEdits:values.has('manual')
       }),source,() => alertMessage('Configuração atualizada.','success'));
+    }
+    if (form.id === 'catalog-search') {
+      const q = String(values.get('q') || '').trim();
+      if (q) location.hash = route('pendencias',{q,archive:'all'});
+    }
+    if (form.id === 'merge-form' && state.canEdit && modal?.merge) {
+      const {primary,duplicate,values:preview} = modal.merge;
+      mergedTaskValues(primary,duplicate,state.tasks);
+      const merged = {...preview,nextAction:String(values.get('nextAction') || '').trim()};
+      return void withResult(() => mergeTasks(db,state.user.uid,{primary,duplicate,values:merged}),source,() => {
+        state.ignoredPairs.add(pairKey(primary,duplicate));
+        closeModal();
+        alertMessage(duplicate.id + ' arquivada como duplicada de ' + primary.id + '.','success');
+      });
     }
     if (form.id === 'filters') {
       const next = route('pendencias',filtersFrom(form));

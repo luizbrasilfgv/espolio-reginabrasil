@@ -1,6 +1,7 @@
 import { TOPICS, PRIORITIES, STATUSES, GROUPS, FIELDS, SOURCES, aggregate, filterTasks, localDate,
   dateLabel, dateTime, display, diff, group, closed, money, normalize, thirdParty } from './model.js';
 import { h, icon, route, taskRoute, btn, go, empty, header, select, input } from './ui.js';
+import { findDuplicatePairs } from './reconcile.js';
 
 const STATUS_ICONS = {total:'list', resolved:'check', scheduled:'calendar', open:'clock', closed_other:'list'};
 const kpi = (key, count) => '<a class="panel kpi" href="' + route('pendencias', {group:key, archive:'all'})
@@ -43,7 +44,12 @@ export function dashboard(state) {
   const since = changes.filter((e) => state.previousVisit && e.createdAt?.toMillis() > state.previousVisit);
   const dependencies = [['U02','S02'],['P05','P06','S01'],['U09','P10','S10'],['P03','P11']].filter((ids) => ids.every((id) => tasks.some((t) => t.id === id)));
   return header('Visão geral', 'Painel do espólio', 'Acompanhe pendências, prazos e as últimas mudanças.',
-    state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : '')
+    go('Conciliar pendências',route('conciliar'))
+    + (state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : ''))
+    + '<section class="panel task-toolbar"><form id="catalog-search" role="search">'
+    + '<label class="task-search"><span class="sr-only">Buscar em todas as pendências</span><input type="search" name="q"'
+    + ' placeholder="Buscar em todas as pendências" maxlength="120" required></label>'
+    + '<button type="submit" class="primary">Buscar</button></form></section>'
     + '<div class="kpis">' + ['total','resolved','scheduled','open', ...(totals.closed_other ? ['closed_other'] : [])].map((key) => kpi(key, totals[key])).join('') + '</div>'
     + '<section class="panel task-shortcuts"><h2>Pendências de agora</h2><div class="row">'
     + shortcuts.map(([label, filters]) => go(h(label) + ' · ' + filterTasks(tasks, filters, state.user.uid, today).length,
@@ -74,7 +80,8 @@ export function dashboard(state) {
 
 export function taskList(state, filters) {
   const heads = header('Controle de trabalho', 'Pendências', '',
-    state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : '');
+    go('Conciliar pendências',route('conciliar'))
+    + (state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : ''));
   if (!state.tasks) return heads + empty('Carregando pendências…');
   const owners = {};
   for (const t of state.tasks) {
@@ -97,7 +104,7 @@ export function taskList(state, filters) {
   });
   return heads + '<section class="panel task-toolbar"><form id="filters">'
     + '<label class="task-search"><span class="sr-only">Buscar pendências</span><input type="search" name="q" value="' + h(filters.q)
-    + '" placeholder="Buscar por ID, título ou assunto" maxlength="120"></label>'
+    + '" placeholder="Buscar por palavra, nome ou ID" maxlength="120"></label>'
     + '<details><summary>Filtros</summary><div class="form-grid">'
     + fields.map(([label,key,options,blank]) => select(label,key,options,filters[key] || (key === 'archive' ? 'active' : ''),blank)).join('')
     + '</div><div class="filter-actions"><button type="submit" class="primary">Aplicar filtros</button></div></details></form>'
@@ -120,6 +127,27 @@ export function taskResults(state, filters) {
         + h(t.ownerLabel || 'Sem responsável') + ' · ' + h(dateLabel(t.dueDate)) + '</small></a>').join('') + '</section>';
   }).join('');
   return '<p class="muted small">' + tasks.length + ' pendência(s)</p>' + (body || empty('Nenhum resultado', 'Ajuste a busca ou limpe os filtros.'));
+}
+
+export function reconciliation(state) {
+  const heads = header('Revisão do catálogo','Conciliar pendências',
+    'Compare os possíveis duplicados e decida o que fazer com cada par.',
+    go('Voltar às pendências',route('pendencias')));
+  if (!state.tasks) return heads + empty('Carregando pendências…');
+  const pairs = findDuplicatePairs(state.tasks,state.ignoredPairs);
+  if (!pairs.length) return heads + empty('Nenhum par para revisar','A busca compara títulos, assuntos e próximas ações entre as pendências visíveis.');
+  return heads + '<p class="muted small">' + pairs.length + ' para revisar</p>' + pairs.map(({left,right,key,reason}) => {
+    const actions = 'data-pair="' + h(key) + '"';
+    const item = (task) => '<div><h3><a href="' + taskRoute(task.id) + '">' + h(task.id + ' · ' + task.title)
+      + '</a></h3><div class="row">' + status(task) + '</div><p class="wrap">' + h(task.nextAction) + '</p></div>';
+    return '<section class="panel stack"><h2>' + h(left.id + ' e ' + right.id)
+      + '</h2><p class="small muted">' + h(reason) + '</p>'
+      + '<div class="form-grid">' + item(left) + item(right) + '</div>'
+      + (state.canEdit ? '<div class="row">'
+        + btn('Manter ' + h(left.id),'review-merge','',actions + ' data-task-id="' + h(left.id) + '"')
+        + btn('Manter ' + h(right.id),'review-merge','',actions + ' data-task-id="' + h(right.id) + '"')
+        + btn('Ignorar nesta revisão','ignore-pair','ghost',actions) + '</div>' : '') + '</section>';
+  }).join('');
 }
 
 export function diffHtml(before, after, names) {

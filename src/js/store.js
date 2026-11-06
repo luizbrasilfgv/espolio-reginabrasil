@@ -110,6 +110,24 @@ export async function saveTask(db, uid, {base = null, values, reason = '', chann
   }
 }
 
+export async function mergeTasks(db, uid, {primary, duplicate, values}) {
+  const clean = validateTask(values,primary.id);
+  if (primary.id === duplicate.id) throw Error('Escolha duas pendências diferentes.');
+  await runTransaction(db, async (tx) => {
+    await ensureEditor(tx,db,uid);
+    const keep = data(await tx.get(ref(db,'tasks',primary.id)));
+    const archive = data(await tx.get(ref(db,'tasks',duplicate.id)));
+    if (!keep || !archive || keep.archived || archive.archived
+      || keep.version !== primary.version || archive.version !== duplicate.version) {
+      throw Error('Uma das pendências mudou. Volte à lista e revise as versões atuais.');
+    }
+    stage(tx,db,uid,keep,primary.id,clean,{channel:'manual',operation:'update',
+      summary:'Unificação com ' + duplicate.id + '. Registro principal mantido.'});
+    stage(tx,db,uid,archive,duplicate.id,{...validateTask(archive,duplicate.id),archived:true},{
+      channel:'manual',operation:'archive',summary:'Arquivada como duplicada de ' + primary.id + '.'});
+  });
+}
+
 export async function requestAccess(db, user, message) {
   const token = await user.getIdTokenResult();
   return runTransaction(db, async (tx) => {

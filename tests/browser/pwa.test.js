@@ -255,6 +255,44 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     const snapshot = JSON.parse(await readFile(file,'utf8'));
     assert.equal(snapshot.tasks.length,34);
     assert.ok(snapshot.tasks.every((t) => !('protocolText' in t) && !('contactText' in t)));
+    const catalog = db.collection('estates/regina/tasks');
+    const sample = (await catalog.doc('U03').get()).data();
+    const title = 'Organizar acesso ao velório de teste';
+    await Promise.all([
+      catalog.doc('P201').set({...sample,id:'P201',title,topic:'funeral_cinzas',
+        description:'Lista de acompanhantes confirmada.',nextAction:'Conferir a lista com a recepção.'}),
+      catalog.doc('P202').set({...sample,id:'P202',title,topic:'funeral_cinzas',
+        description:'Orientações recebidas da recepção.',nextAction:'Avisar os acompanhantes.'})
+    ]);
+    await nav(manager,'Painel');
+    await manager.getByRole('searchbox',{name:'Buscar em todas as pendências'}).fill('ACOMPANHANTES');
+    await manager.getByRole('button',{name:'Buscar',exact:true}).click();
+    await heading(manager,'Pendências');
+    await manager.locator('.task-row[href="#/pendencia/P202"]').waitFor();
+    assert.deepEqual(await manager.locator('.task-row').evaluateAll((rows) => rows.map((row) => row.hash)),
+      ['#/pendencia/P201','#/pendencia/P202']);
+    await manager.getByRole('link',{name:'Conciliar pendências'}).click();
+    await heading(manager,'Conciliar pendências');
+    await manager.getByRole('button',{name:'Manter P201'}).click();
+    await manager.getByRole('heading',{name:'Revisar unificação'}).waitFor();
+    assert.equal((await catalog.doc('P202').get()).get('archived'),false);
+    const nextAction = manager.getByRole('textbox',{name:'Próxima ação após unificar'});
+    assert.match(await nextAction.inputValue(),/Conferir a lista com a recepção.\s+Avisar os acompanhantes./);
+    await nextAction.fill('Conferir a lista com a recepção e avisar os acompanhantes.');
+    await manager.getByRole('button',{name:'Aprovar unificação'}).click();
+    await manager.locator('#conteudo').getByText('P202 arquivada como duplicada de P201.').waitFor();
+    const [kept,archived] = await Promise.all([catalog.doc('P201').get(),catalog.doc('P202').get()]);
+    assert.equal(kept.get('archived'),false);
+    assert.match(kept.get('description'),/Lista de acompanhantes confirmada.\s+Orientações recebidas/);
+    assert.equal(kept.get('nextAction'),'Conferir a lista com a recepção e avisar os acompanhantes.');
+    assert.equal(archived.get('archived'),true);
+    assert.equal(archived.get('nextAction'),'Avisar os acompanhantes.');
+    const audit = await db.doc('estates/regina/reginaEvents/' + archived.get('lastEventId')).get();
+    assert.equal(audit.get('summary'),'Arquivada como duplicada de P201.');
+    await nav(manager,'Painel');
+    await manager.getByRole('searchbox',{name:'Buscar em todas as pendências'}).fill('acompanhantes');
+    await manager.getByRole('button',{name:'Buscar',exact:true}).click();
+    await manager.locator('.task-row[href="#/pendencia/P202"]').getByText(/Arquivada/).waitFor();
     await nav(manager,'Mais');
     await manager.getByRole('link',{name:'Gestão de acessos'}).click();
     await manager.getByRole('button',{name:'Alterar acesso'}).click();

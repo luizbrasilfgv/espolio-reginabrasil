@@ -138,7 +138,7 @@ export function aggregate(tasks) {
   return {totals, topics, priorities, statuses, percent: totals.total ? 100 * totals.resolved / totals.total : 0};
 }
 export function filterTasks(tasks, filters, uid, today = localDate()) {
-  const term = normalize(filters.q).trim();
+  const term = normalize(filters.q).trim().replace(/\s+/g,' ');
   const matchesGroup = Object.hasOwn(groupFilters, filters.group)
     ? groupFilters[filters.group] : (task) => group(task) === filters.group;
   return tasks.filter((task) => {
@@ -158,7 +158,8 @@ export function filterTasks(tasks, filters, uid, today = localDate()) {
     if (filters.view === 'critical' && (task.priority !== 'urgente' || closed(task))) return false;
     if (!term) return true;
     if (TASK_ID.test(term.toUpperCase())) return task.id === term.toUpperCase();
-    return normalize([task.id, task.title, task.description, task.nextAction, task.ownerLabel, task.tags, task.sourceNote,
-      TOPICS[task.topic]].join(' ')).includes(term);
+    return [task.id, task.title, task.description, task.nextAction, task.ownerLabel, task.tags, task.sourceNote,
+      task.contactText, task.protocolText, TOPICS[task.topic], STATUSES[task.statusCode], PRIORITIES[task.priority]]
+      .some((value) => normalize(value).replace(/\s+/g,' ').includes(term));
   }).sort((a, b) => a.id.localeCompare(b.id, 'pt-BR', {numeric:true}));
 }
