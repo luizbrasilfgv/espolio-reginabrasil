@@ -94,8 +94,9 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     await manager.goto(site);
     await login(manager,admin);
     await heading(manager,'Painel do espólio');
-    await manager.locator('.kpi').first().getByText('34',{exact:true}).waitFor();
-    assert.deepEqual(await manager.locator('.kpi strong').allTextContents(),['34','3','1','30']);
+    await manager.getByRole('link',{name:'30 Em aberto'}).waitFor();
+    await manager.getByRole('link',{name:'1 agendada'}).waitFor();
+    await manager.getByText('3 resolvidas de 34 pendências consideradas.').waitFor();
     await manager.screenshot({path:out + '/desktop-1440.png'});
     await manager.getByRole('link',{name:/^Urgentes ·/}).click();
     await heading(manager,'Pendências');
@@ -110,7 +111,7 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     await manager.getByRole('button',{name:'Aprovar editor'}).click();
     await manager.getByRole('button',{name:'Confirmar decisão'}).click();
     await heading(view,'Painel do espólio');
-    await view.locator('.kpi').first().getByText('34',{exact:true}).waitFor();
+    await view.getByRole('link',{name:'30 Em aberto'}).waitFor();
     await view.screenshot({path:out + '/mobile-390.png'});
     for (const width of [360,390,768,1440]) {
       await view.setViewportSize({width,height:900});
@@ -236,12 +237,12 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     assert.equal((await db.doc('estates/regina/tasks/U08').get()).get('version'),1);
     await view.getByRole('textbox',{name:'Texto da atualização'}).fill('Texto de exemplo sem envio.');
     await nav(manager,'Painel');
-    await manager.getByRole('link',{name:'33 Total sem canceladas'}).waitFor();
-    await manager.getByText('12,1% concluído',{exact:true}).waitFor();
-    await manager.getByRole('link',{name:'33 Total sem canceladas'}).click();
+    await manager.getByRole('link',{name:'33 pendências consideradas'}).waitFor();
+    await manager.getByText('12,1%',{exact:true}).waitFor();
+    await manager.getByRole('link',{name:'33 pendências consideradas'}).click();
     await manager.getByText('33 pendência(s)',{exact:true}).waitFor();
     await nav(manager,'Painel');
-    await manager.getByRole('link',{name:'1 Canceladas'}).click();
+    await manager.getByRole('link',{name:'1 cancelada',exact:true}).click();
     await manager.getByText('P13',{exact:true}).waitFor();
     await nav(manager,'Mais');
     await manager.getByRole('link',{name:'Relatórios e exportação'}).click();
@@ -290,6 +291,7 @@ test('PWA com Google simulado, aprovação, atualização, exportação e revoga
     const audit = await db.doc('estates/regina/reginaEvents/' + archived.get('lastEventId')).get();
     assert.equal(audit.get('summary'),'Arquivada como duplicada de P201.');
     await nav(manager,'Painel');
+    await manager.getByRole('link',{name:'34 pendências consideradas'}).waitFor();
     await manager.getByRole('searchbox',{name:'Buscar em todas as pendências'}).fill('acompanhantes');
     await manager.getByRole('button',{name:'Buscar',exact:true}).click();
     await manager.locator('.task-row[href="#/pendencia/P202"]').getByText(/Arquivada/).waitFor();

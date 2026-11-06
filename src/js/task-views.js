@@ -3,9 +3,6 @@ import { TOPICS, PRIORITIES, STATUSES, GROUPS, FIELDS, SOURCES, aggregate, filte
 import { h, icon, route, taskRoute, btn, go, empty, header, select, input } from './ui.js';
 import { findDuplicatePairs } from './reconcile.js';
 
-const STATUS_ICONS = {total:'list', resolved:'check', scheduled:'calendar', open:'clock', closed_other:'list'};
-const kpi = (key, count) => '<a class="panel kpi" href="' + route('pendencias', {group:key, archive:'all'})
-  + '">' + icon(STATUS_ICONS[key]) + '<strong>' + count + '</strong><span class="small muted">' + GROUPS[key] + '</span></a>';
 const status = (task) => '<span class="chip ' + group(task) + '">' + h(STATUSES[task.statusCode]) + '</span>';
 const priority = (task) => '<span class="chip ' + h(task.priority) + '">' + h(PRIORITIES[task.priority]) + '</span>';
 const compact = (tasks, note, description = (t) => t.nextAction) => tasks.length ? '<ul class="compact-list">' + tasks.map((t) =>
@@ -13,11 +10,20 @@ const compact = (tasks, note, description = (t) => t.nextAction) => tasks.length
   + '</ul>' : '<p class="muted small">' + h(note) + '</p>';
 const actorLabel = (event, names) => names[event.actorUid] ?? (event.channel === 'initial_import' ? 'Importação inicial' : 'Membro do painel');
 
+function progressGauge(percent) {
+  const arc = 'd="M 10 74 A 64 64 0 0 1 138 74" pathLength="100"';
+  return '<div class="progress-gauge"><svg viewBox="0 0 148 84" aria-hidden="true">'
+    + '<path class="gauge-track" ' + arc + '/>'
+    + (percent > 0 ? '<path class="gauge-value" ' + arc + ' stroke-dasharray="' + percent + ' 100"/>' : '')
+    + '</svg><strong>' + percent.toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%</strong></div>';
+}
+
 export function dashboard(state) {
   const tasks = state.tasks;
   if (!tasks) return header('Visão geral', 'Painel do espólio') + empty('Carregando pendências…');
-  const {totals, topics, priorities, statuses, percent} = aggregate(tasks);
-  const live = tasks.filter((t) => !t.archived && !closed(t));
+  const visible = tasks.filter((task) => !task.archived);
+  const {totals, topics, priorities, statuses, percent} = aggregate(visible);
+  const live = visible.filter((task) => !closed(task));
   const today = localDate();
   const queues = [
     ['Próximos compromissos', live.filter((t) => t.statusCode === 'agendado'), (t) => dateLabel(t.dueDate) + ' · ' + t.nextAction],
@@ -36,10 +42,8 @@ export function dashboard(state) {
   const shortcuts = [
     ['Próximos 7 dias', {group:'pending',due:'week'}],
     ['Urgentes', {group:'pending',priority:'urgente'}],
-    ['Em aberto', {group:'open'}],
     ['Minhas pendências', {group:'pending',owner:'mine'}]
   ];
-  const max = Math.max(1, ...Object.values(topics).map((v) => v.total));
   const changes = (state.events || []).filter((e) => e.channel !== 'initial_import');
   const since = changes.filter((e) => state.previousVisit && e.createdAt?.toMillis() > state.previousVisit);
   const dependencies = [['U02','S02'],['P05','P06','S01'],['U09','P10','S10'],['P03','P11']].filter((ids) => ids.every((id) => tasks.some((t) => t.id === id)));
@@ -48,23 +52,32 @@ export function dashboard(state) {
     + (state.canEdit ? btn(icon('plus') + ' Nova pendência', 'new-task', 'primary') : ''))
     + '<section class="panel task-toolbar"><form id="catalog-search" role="search">'
     + '<label class="task-search"><span class="sr-only">Buscar em todas as pendências</span><input type="search" name="q"'
-    + ' placeholder="Buscar em todas as pendências" maxlength="120" required></label>'
+    + ' placeholder="Buscar pendências" maxlength="120" required></label>'
     + '<button type="submit" class="primary">Buscar</button></form></section>'
-    + '<div class="kpis">' + ['total','resolved','scheduled','open', ...(totals.closed_other ? ['closed_other'] : [])].map((key) => kpi(key, totals[key])).join('') + '</div>'
+    + '<div class="dashboard-summary"><section class="panel open-summary" aria-label="Trabalho em aberto">'
+    + '<a class="open-total" href="' + route('pendencias',{group:'open'}) + '"><strong>' + totals.open
+    + '</strong><span>Em aberto</span>' + icon('arrow') + '</a>'
+    + '<a class="open-scheduled" href="' + route('pendencias',{group:'scheduled'}) + '">' + icon('calendar')
+    + totals.scheduled + (totals.scheduled === 1 ? ' agendada' : ' agendadas') + '</a></section>'
+    + '<section class="panel progress-box">' + progressGauge(percent)
+    + '<div><h2>Progresso geral</h2><p class="muted small">'
+    + '<a href="' + route('pendencias',{group:'resolved'}) + '">' + totals.resolved + ' resolvidas</a>'
+    + ' de <a href="' + route('pendencias',{group:'total'}) + '">' + totals.total + ' pendências consideradas</a>.</p>'
+    + (totals.closed_other ? '<p class="muted small"><a href="' + route('pendencias',{group:'closed_other'}) + '">'
+      + totals.closed_other + (totals.closed_other === 1 ? ' cancelada' : ' canceladas') + '</a> fora do cálculo.</p>' : '')
+    + '</div></section></div>'
     + '<section class="panel task-shortcuts"><h2>Pendências de agora</h2><div class="row">'
     + shortcuts.map(([label, filters]) => go(h(label) + ' · ' + filterTasks(tasks, filters, state.user.uid, today).length,
       route('pendencias', filters))).join('') + '</div></section>'
-    + '<section class="panel progress-box"><div class="row spread"><h2>Progresso geral</h2><strong>' + percent.toLocaleString('pt-BR',{maximumFractionDigits:1})
-    + '% concluído</strong></div><progress aria-label="Percentual de pendências resolvidas" max="100" value="' + percent + '"></progress></section>'
-    + '<div class="cols dashboard-cols"><section class="panel"><h2>Por assunto</h2><p class="small muted">Total sem canceladas e resolvidas em cada área.</p>'
-    + Object.entries(topics).map(([key, n]) => '<a class="topic-row" href="' + route('pendencias', {topic:key,group:'total',archive:'all'})
-      + '"><span class="row spread"><span>' + h(TOPICS[key]) + '</span><small><strong>' + n.total + '</strong> · ' + n.resolved
-      + ' resolv.</small></span><span class="bar" aria-hidden="true"><span style="width:' + n.total / max * 100 + '%"><i style="width:'
-      + (n.total ? n.resolved / n.total * 100 : 0) + '%"></i></span></span></a>').join('')
+    + '<div class="cols dashboard-cols"><section class="panel"><h2>Progresso por assunto</h2>'
+    + Object.entries(topics).map(([key, n]) => '<a class="topic-row" href="' + route('pendencias', {topic:key,group:'total'})
+      + '"><span class="row spread"><span>' + h(TOPICS[key]) + '</span><small><strong>' + n.resolved + '</strong> de ' + n.total
+      + ' resolvidas</small></span><span class="bar" aria-hidden="true"><span style="width:'
+      + (n.total ? n.resolved / n.total * 100 : 0) + '%"></span></span></a>').join('')
     + '</section><section class="panel"><h2>Radar de prioridades</h2><p class="small muted">Atalhos para as pendências em andamento.</p><div class="radar">'
     + radar.map(([label, f]) => '<a href="' + h(route('pendencias', f)) + '"><strong>' + filterTasks(tasks, f, state.user.uid, today).length + '</strong>' + label + '</a>').join('')
     + '</div><h3 style="margin-top:16px">Prioridade operacional</h3><div class="row">'
-    + Object.entries(priorities).map(([k,n]) => go(h(PRIORITIES[k]) + ' · ' + n, route('pendencias',{priority:k,group:'total',archive:'all'}))).join('') + '</div></section></div>'
+    + Object.entries(priorities).map(([k,n]) => go(h(PRIORITIES[k]) + ' · ' + n, route('pendencias',{priority:k,group:'total'}))).join('') + '</div></section></div>'
     + '<div class="cols">' + queues.map(([title, rows, desc]) => '<section class="panel"><h2>' + h(title) + '</h2>'
       + compact(rows.sort((a,b) => (a.dueDate || 'z').localeCompare(b.dueDate || 'z')).slice(0,4), 'Nenhum item nesta fila.', desc) + '</section>').join('') + '</div>'
     + '<div class="cols"><section class="panel"><h2>Vínculos gerenciais</h2><p class="muted small">Informações relacionadas que podem avançar em paralelo.</p>'
@@ -74,7 +87,7 @@ export function dashboard(state) {
     + (changes.length ? changes.slice(0,3).map((e) => '<p class="wrap"><a href="' + taskRoute(e.taskId) + '">' + h(e.taskId)
       + '</a> · ' + h(e.summary) + '<br><small class="muted">' + h(actorLabel(e, state.names)) + ' · ' + h(dateTime(e.createdAt)) + '</small></p>').join('') : '<p class="muted">Nenhuma alteração após a importação.</p>')
     + go('Ver atividade', route('atividade'), 'ghost') + '</section></div><section class="panel"><h2>Distribuição por situação</h2><div class="row">'
-    + Object.entries(statuses).filter(([,n]) => n).map(([k,n]) => go(h(STATUSES[k]) + ' · ' + n, route('pendencias',{statusCode:k,archive:'all'}))).join('')
+    + Object.entries(statuses).filter(([,n]) => n).map(([k,n]) => go(h(STATUSES[k]) + ' · ' + n, route('pendencias',{statusCode:k}))).join('')
     + '</div></section>';
 }
 
